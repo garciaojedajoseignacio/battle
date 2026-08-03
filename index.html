@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Osorno Battle: el juego de la ciudad en Telegram</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Osorno Battle es un juego ambientado en la ciudad de Osorno. Completa misiones, gana tokens y XP y compite con otros jugadores, directamente desde Telegram.">
+  <meta name="keywords" content="Osorno, juego, Telegram, misiones, eventos, comunidad, Chile">
+  <meta name="author" content="Osorno Battle">
+
+  <style>
+    :root {
+      --bg-main: #050816;
+      --bg-section: #0b1020;
+      --accent: #00e0b8;
+      --accent-soft: rgba(0, 224, 184, 0.15);
+      --text-main: #f7f7ff;
+      --text-muted: #c3c7d9;
+      --border-soft: #1c2238;
+      --danger: #ff6b6b;
+      --font-main: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background: radial-gradient(circle at top, #131a33 0, #050816 45%);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px 16px 56px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: conic-gradient(from 200deg, #00e0b8, #34b5ff, #ffdf6b, #00e0b8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 18px rgba(0, 224, 184, 0.6);
+    }
+
+    .logo-mark span {
+      font-size: 18px;
+      font-weight: 700;
+      color: #050816;
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-text strong {
+      font-size: 15px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .logo-text span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    nav {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+    }
+
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 4px 0;
+      border-bottom: 1px solid transparent;
+    }
+
+    nav a:hover {
+      color: var(--text-main);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Hero */
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 24px;
+      align-items: center;
+      padding: 24px 20px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(0, 224, 184, 0.08), rgba(11, 16, 32, 0.95));
+      border: 1px solid var(--border-soft);
+      box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.02);
+      margin-bottom: 32px;
+    }
+
+    .hero-copy {
+      padding-right: 12px;
+    }
+
+    .tagline {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 999px;
+      background-color: rgba(0, 224, 184, 0.08);
+      border: 1px solid rgba(0, 224, 184, 0.45);
+      margin-bottom: 12px;
+    }
+
+    .tagline span.icon {
+      font-size: 12px;
+    }
+
+    .hero-title {
+      font-size: clamp(28px, 4vw, 34px);
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      margin-bottom: 10px;
+    }
+
+    .hero-highlight {
+      color: var(--accent);
+    }
+
+    .hero-subtitle {
+      font-size: 15px;
+      color: var(--text-muted);
+      max-width: 480px;
+      margin-bottom: 18px;
+    }
+
+    .hero-microcopy {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #050816;
+      background: linear-gradient(135deg, #00e0b8, #34b5ff);
+      box-shadow:
+        0 10px 30px rgba(0, 224, 184, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.2);
+      text-decoration: none;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.07);
+      box-shadow:
+        0 14px 32px rgba(0, 224, 184, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-primary span.icon {
+      font-size: 16px;
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background-color: rgba(11, 16, 32, 0.85);
+      color: var(--text-muted);
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.12s ease, color 0.12s ease, background-color 0.12s ease;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--text-main);
+      background-color: rgba(7, 10, 21, 0.95);
+    }
+
+    .hero-note {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .hero-note strong {
+      color: var(--accent);
+    }
+
+    /* Hero mockup */
+    .hero-mockup {
+      border-radius: 18px;
+      background: radial-gradient(circle at 0 0, rgba(0, 224, 184, 0.45), rgba(5, 8, 22, 0.85) 40%);
+      border: 1px solid rgba(0, 224, 184, 0.3);
+      box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255, 255, 255, 0.06);
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .phone {
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto;
+      border-radius: 30px;
+      background: #000;
+      padding: 10px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    .phone-inner {
+      border-radius: 24px;
+      background: linear-gradient(180deg, #111827, #020617);
+      padding: 10px;
+      color: #e5e7eb;
+      font-size: 11px;
+    }
+
+    .phone-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .phone-header-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .phone-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #00e0b8, #34b5ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #020617;
+    }
+
+    .phone-title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone-title strong {
+      font-size: 11px;
+    }
+
+    .phone-title span {
+      font-size: 9px;
+      color: #9ca3af;
+    }
+
+    .phone-status {
+      font-size: 9px;
+      color: #6b7280;
+    }
+
+    .phone-message {
+      background: #0b1220;
+      border-radius: 12px;
+      padding: 9px 10px;
+      margin-bottom: 8px;
+    }
+
+    .phone-message strong {
+      font-size: 11px;
+    }
+
+    .phone-message p {
+      margin-top: 4px;
+      font-size: 10px;
+      color: #9ca3af;
+    }
+
+    .phone-list {
+      margin-top: 4px;
+      font-size: 10px;
+      color: #9ca3af;
+    }
+
+    .phone-list li {
+      margin-bottom: 2px;
+    }
+
+    .phone-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .phone-btn {
+      flex: 1;
+      text-align: center;
+      font-size: 10px;
+      padding: 5px 6px;
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      background: #020617;
+      color: #e5e7eb;
+    }
+
+    .phone-btn.primary {
+      border-color: #22c55e;
+      background: #16a34a;
+      color: #022c22;
+      font-weight: 600;
+    }
+
+    .phone-footer {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 9px;
+      color: #6b7280;
+    }
+
+    /* Sections */
+    section {
+      margin-bottom: 32px;
+    }
+
+    .section-card {
+      border-radius: 16px;
+      background: var(--bg-section);
+      border: 1px solid var(--border-soft);
+      padding: 18px 18px 18px;
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.55);
+    }
+
+    .section-header {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .section-body {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 18px;
+      margin-top: 10px;
+    }
+
+    .section-grid > div {
+      font-size: 13px;
+    }
+
+    .bullet-list {
+      list-style: none;
+      margin-top: 4px;
+    }
+
+    .bullet-list li {
+      margin-bottom: 4px;
+      position: relative;
+      padding-left: 18px;
+    }
+
+    .bullet-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: rgba(11, 16, 32, 0.8);
+      color: var(--text-muted);
+    }
+
+    .pill.highlight {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* CTA section */
+    .cta-section {
+      border-radius: 18px;
+      padding: 18px 18px 20px;
+      background: linear-gradient(135deg, rgba(0, 224, 184, 0.18), rgba(5, 8, 22, 0.96));
+      border: 1px solid rgba(0, 224, 184, 0.35);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.8);
+      text-align: center;
+    }
+
+    .cta-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .cta-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .cta-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .cta-note {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .cta-note strong {
+      color: var(--accent);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(28, 34, 56, 0.8);
+      padding-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+    }
+
+    .footer-links a:hover {
+      color: var(--text-main);
+    }
+
+    /* Responsive */
+    @media (max-width: 840px) {
+      .hero {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .hero-copy {
+        padding-right: 0;
+      }
+
+      nav {
+        display: none;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .page {
+        padding: 18px 12px 42px;
+      }
+
+      .hero {
+        padding: 18px 14px;
+      }
+
+      .section-card {
+        padding: 14px 14px 16px;
+      }
+
+      .section-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .cta-section {
+        padding: 16px 14px 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="logo">
+        <div class="logo-mark">
+          <span>OB</span>
+        </div>
+        <div class="logo-text">
+          <strong>Osorno Battle</strong>
+          <span>Juego local en Telegram</span>
+        </div>
+      </div>
+      <nav>
+        <a href="#que-es">Qué es</a>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#misiones">Misiones</a>
+        <a href="#comunidad">Comunidad</a>
+      </nav>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="tagline">
+            <span class="icon">📲</span>
+            <span>Juego local en Telegram</span>
+          </div>
+          <h1 class="hero-title">
+            Osorno <span class="hero-highlight">Battle</span>: el juego de la ciudad en Telegram
+          </h1>
+          <p class="hero-subtitle">
+            Completa misiones diarias, gana tokens y XP y compite con otros jugadores de Osorno. Todo sin salir de Telegram.
+          </p>
+          <p class="hero-microcopy">
+            Diseñado para que en menos de 15&nbsp;segundos entiendas qué es y hagas clic en “Jugar ahora en Telegram”.
+          </p>
+
+          <div class="hero-cta-row">
+            <!-- Cambia el enlace al handle de tu bot -->
+            <a class="btn-primary" href="https://t.me/TU_BOT_DE_OSORNO" target="_blank" rel="noopener">
+              <span class="icon">▶️</span>
+              <span>Jugar ahora en Telegram</span>
+            </a>
+            <a class="btn-secondary" href="#como-funciona">
+              <span>Ver cómo funciona</span>
+            </a>
+          </div>
+
+          <p class="hero-note">
+            <strong>Solo necesitas Telegram.</strong> Es gratuito, no instalas nada extra y puedes dejar el juego listo en un par de toques.
+          </p>
+        </div>
+
+        <div class="hero-mockup" aria-hidden="true">
+          <div class="phone">
+            <div class="phone-inner">
+              <div class="phone-header">
+                <div class="phone-header-left">
+                  <div class="phone-avatar">OB</div>
+                  <div class="phone-title">
+                    <strong>Osorno Battle Bot</strong>
+                    <span>Juego · Osorno</span>
+                  </div>
+                </div>
+                <div class="phone-status">online</div>
+              </div>
+
+              <div class="phone-message">
+                <strong>CriptoOsorno · Menú principal</strong>
+                <p>
+                  ¡Tu asistente diario está listo! Completa misiones, haz tu check‑in y entra a ligas con otros jugadores de Osorno.
+                </p>
+                <ul class="phone-list">
+                  <li>Misiones diarias y check‑in</li>
+                  <li>Duelos versus entre jugadores</li>
+                  <li>Ranking semanal y ligas</li>
+                </ul>
+                <div class="phone-buttons">
+                  <div class="phone-btn primary">Misiones</div>
+                  <div class="phone-btn">Ranking</div>
+                </div>
+              </div>
+
+              <div class="phone-footer">
+                Juega directamente en Telegram · Diseñado para la ciudad de Osorno
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Qué es Osorno Battle -->
+      <section id="que-es">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Qué es Osorno Battle</h2>
+            </div>
+            <div class="section-label">Resumen del juego</div>
+          </div>
+          <div class="section-body">
+            <p>
+              Osorno Battle es un juego de misiones y duelos ambientado en la ciudad de Osorno, pensado para jugarlo directamente dentro de Telegram. 
+              Cada día puedes hacer tu check‑in, completar retos y avanzar en tu progreso sin instalar aplicaciones nuevas.
+            </p>
+            <p style="margin-top:6px;">
+              El objetivo es que cualquier persona de la ciudad entienda de inmediato que es un juego local, rápido de usar y conectado con su entorno: clima, noticias y eventos de Osorno.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cómo funciona -->
+      <section id="como-funciona">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Cómo funciona</h2>
+            </div>
+            <div class="section-label">3 pasos simples</div>
+          </div>
+          <div class="section-body">
+            <div class="section-grid">
+              <div>
+                <p><strong>En menos de un minuto puedes estar jugando.</strong></p>
+                <ul class="bullet-list">
+                  <li><strong>1. Entra al bot en Telegram.</strong> Haz clic en “Jugar ahora en Telegram”, se abrirá el bot y podrás usar <code>/start</code> para activar el juego.</li>
+                  <li><strong>2. Completa misiones y tu check‑in diario.</strong> Gana tokens y XP mientras mantienes tu racha y cumples retos.</li>
+                  <li><strong>3. Sube de nivel y compite.</strong> Entra a duelos versus, avanza en el ranking semanal y participa en ligas con otros jugadores de Osorno.</li>
+                </ul>
+              </div>
+              <div>
+                <p><strong>Diseño pensado para conversión.</strong></p>
+                <p style="margin-top:4px;">
+                  La página existe para una cosa: que el visitante haga clic en el botón y se convierta en jugador activo del bot. 
+                  Todo el texto y los botones están optimizados para claridad, velocidad y acción.
+                </p>
+                <div class="pill-row">
+                  <span class="pill highlight">Claridad en 15 segundos</span>
+                  <span class="pill">Enfoque total en “Jugar ahora”</span>
+                  <span class="pill">Sin fricción ni pasos ocultos</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Misiones y recompensas -->
+      <section id="misiones">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Misiones y recompensas</h2>
+            </div>
+            <div class="section-label">Tokens, XP y duelos</div>
+          </div>
+          <div class="section-body">
+            <div class="section-grid">
+              <div>
+                <p><strong>Lo que el jugador puede hacer dentro del bot.</strong></p>
+                <ul class="bullet-list">
+                  <li><strong>Check‑in diario.</strong> Asegura tu racha de juego, gana XP y mantén tu progreso vivo.</li>
+                  <li><strong>Misiones temáticas.</strong> Misiones de batalla, cultura, deporte y actividades relacionadas con Osorno.</li>
+                  <li><strong>Duelos versus.</strong> Reta a otros jugadores, compite y demuestra tu nivel en enfrentamientos directos.</li>
+                  <li><strong>Tokens y XP.</strong> Gana recursos, sube de nivel y mejora tu posición en el ranking.</li>
+                  <li><strong>Ranking y ligas.</strong> Participa en clasificaciones semanales y ligas para ver quién domina la ciudad.</li>
+                </ul>
+              </div>
+              <div>
+                <p><strong>Mensajes claros dentro del bot.</strong></p>
+                <p style="margin-top:4px;">
+                  Cada acción (check‑in, reclamo de recompensa, duelo) devuelve un mensaje de confirmación con saldo, XP y estado de la misión. 
+                  El jugador siempre sabe qué ganó, qué le falta y cuál es su próxima acción.
+                </p>
+                <div class="pill-row">
+                  <span class="pill">Feedback inmediato</span>
+                  <span class="pill">Progreso visible</span>
+                  <span class="pill">Motivación para volver cada día</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Comunidad / Eventos de Osorno -->
+      <section id="comunidad">
+        <div class="section-card">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Comunidad y eventos de Osorno</h2>
+            </div>
+            <div class="section-label">Juego conectado a la ciudad</div>
+          </div>
+          <div class="section-body">
+            <div class="section-grid">
+              <div>
+                <p><strong>Más que un juego: una experiencia local.</strong></p>
+                <ul class="bullet-list">
+                  <li>Resúmenes diarios con clima y noticias de Osorno, integrados en el mensaje de <code>/start</code>.</li>
+                  <li>Actividades inspiradas en eventos, cultura y deporte de la ciudad.</li>
+                  <li>Espacio para torneos, desafíos especiales y campañas temáticas ligadas a fechas importantes.</li>
+                </ul>
+              </div>
+              <div>
+                <p><strong>Qué tipo de contenido se prioriza.</strong></p>
+                <p style="margin-top:4px;">
+                  El juego se centra en contenido realmente local: eventos culturales, actividades familiares, deporte, ferias y festivales. 
+                  Se evita mezclar noticias nacionales o temas que no tengan una relación clara con la ciudad de Osorno.
+                </p>
+                <div class="pill-row">
+                  <span class="pill highlight">Identidad local muy marcada</span>
+                  <span class="pill">Enfoque en comunidad</span>
+                  <span class="pill">Eventos como disparadores de misiones</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CTA final -->
+      <section>
+        <div class="cta-section">
+          <h2 class="cta-title">¿Listo para entrar a Osorno Battle?</h2>
+          <p class="cta-subtitle">
+            Haz clic en el botón, abre el bot en Telegram y activa tu primera misión en menos de un minuto.
+          </p>
+          <div class="cta-actions">
+            <!-- Usa el mismo enlace que en el hero -->
+            <a class="btn-primary" href="https://t.me/TU_BOT_DE_OSORNO" target="_blank" rel="noopener">
+              <span class="icon">🎮</span>
+              <span>Jugar en Telegram</span>
+            </a>
+            <a class="btn-secondary" href="#misiones">
+              Ver misiones y recompensas
+            </a>
+          </div>
+          <p class="cta-note">
+            <strong>Gratis y sin registro complejo.</strong> Si ya tienes Telegram, estás a un par de toques de convertirte en jugador de Osorno Battle.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div>
+        © <span id="year"></span> Osorno Battle · Juego local en Telegram
+      </div>
+      <div class="footer-links">
+        <a href="#que-es">Sobre el juego</a>
+        <a href="#comunidad">Comunidad</a>
+        <a href="#como-funciona">Guía rápida</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Año dinámico
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
