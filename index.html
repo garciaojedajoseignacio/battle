@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Osorno Battle: el juego de la ciudad en Telegram</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Osorno Battle es un juego ambientado en la ciudad de Osorno. Completa misiones, gana tokens y XP y compite con otros jugadores, directamente desde Telegram.">
+  <meta name="description" content="Osorno Battle es un juego local en Telegram. Completa misiones, gana XP y recompensas, participa en duelos y compite por el primer lugar en Osorno.">
   <meta name="keywords" content="Osorno, juego, Telegram, misiones, eventos, comunidad, Chile">
   <meta name="author" content="Osorno Battle">
 
@@ -116,7 +116,6 @@
       border-bottom-color: var(--accent);
     }
 
-    /* Hero */
     .hero {
       display: grid;
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -288,7 +287,6 @@
       color: var(--accent);
     }
 
-    /* Hero mockup */
     .hero-mockup {
       border-radius: 18px;
       background: radial-gradient(circle at 0 0, rgba(0, 224, 184, 0.45), rgba(5, 8, 22, 0.85) 40%);
@@ -444,7 +442,6 @@
       color: #6b7280;
     }
 
-    /* Sections */
     section {
       margin-bottom: 32px;
     }
@@ -554,7 +551,6 @@
       color: var(--accent);
     }
 
-    /* CTA section */
     .cta-section {
       border-radius: 18px;
       padding: 18px 18px 20px;
@@ -613,7 +609,6 @@
       color: var(--accent);
     }
 
-    /* Footer */
     footer {
       margin-top: 32px;
       font-size: 11px;
@@ -640,7 +635,6 @@
       color: var(--text-main);
     }
 
-    /* Particles */
     .particle {
       position: fixed;
       width: 4px;
@@ -653,154 +647,76 @@
       box-shadow: 0 0 8px rgba(0, 224, 184, 0.8);
     }
 
-    /* Animations */
     @keyframes logoSpin {
-      to {
-        transform: rotate(360deg);
-      }
+      to { transform: rotate(360deg); }
     }
 
     @keyframes heroGlow {
-      0%, 100% {
-        transform: translate(0, 0) scale(1);
-        opacity: 0.6;
-      }
-      50% {
-        transform: translate(-20px, -10px) scale(1.1);
-        opacity: 1;
-      }
+      0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+      50% { transform: translate(-20px, -10px) scale(1.1); opacity: 1; }
     }
 
     @keyframes heroFadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes taglineSlide {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes titleReveal {
-      from {
-        opacity: 0;
-        transform: translateY(25px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(25px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes textFadeIn {
-      from {
-        opacity: 0;
-      }
-      to {
-        opacity: 1;
-      }
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     @keyframes btnPulse {
       0%, 100% {
-        box-shadow:
-          0 10px 30px rgba(0, 224, 184, 0.5),
-          0 0 0 1px rgba(255, 255, 255, 0.2);
+        box-shadow: 0 10px 30px rgba(0, 224, 184, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.2);
       }
       50% {
-        box-shadow:
-          0 14px 40px rgba(0, 224, 184, 0.7),
-          0 0 0 1px rgba(255, 255, 255, 0.35);
+        box-shadow: 0 14px 40px rgba(0, 224, 184, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.35);
       }
     }
 
     @keyframes mockupSlide {
-      from {
-        opacity: 0;
-        transform: translateX(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
     }
 
     @keyframes ctaGlow {
-      0%, 100% {
-        filter: brightness(1);
-      }
-      50% {
-        filter: brightness(1.15);
-      }
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.15); }
     }
 
     @keyframes ctaEnergy {
-      0%, 100% {
-        transform: translate(0, 0) scale(1);
-      }
-      50% {
-        transform: translate(15px, -15px) scale(1.1);
-      }
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(15px, -15px) scale(1.1); }
     }
 
     @keyframes particleFloat {
-      0% {
-        opacity: 1;
-        transform: translate(0, 0) scale(1);
-      }
-      100% {
-        opacity: 0;
-        transform: translate(var(--dx), var(--dy)) scale(0.2);
-      }
+      0% { opacity: 1; transform: translate(0, 0) scale(1); }
+      100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); }
     }
 
-    /* Responsive */
     @media (max-width: 840px) {
-      .hero {
-        grid-template-columns: minmax(0, 1fr);
-      }
-
-      .hero-copy {
-        padding-right: 0;
-      }
-
-      nav {
-        display: none;
-      }
+      .hero { grid-template-columns: minmax(0, 1fr); }
+      .hero-copy { padding-right: 0; }
+      nav { display: none; }
     }
 
     @media (max-width: 600px) {
-      .page {
-        padding: 18px 12px 42px;
-      }
-
-      .hero {
-        padding: 18px 14px;
-      }
-
-      .section-card {
-        padding: 14px 14px 16px;
-      }
-
-      .section-grid {
-        grid-template-columns: minmax(0, 1fr);
-      }
-
-      .cta-section {
-        padding: 16px 14px 18px;
-      }
+      .page { padding: 18px 12px 42px; }
+      .hero { padding: 18px 14px; }
+      .section-card { padding: 14px 14px 16px; }
+      .section-grid { grid-template-columns: minmax(0, 1fr); }
+      .cta-section { padding: 16px 14px 18px; }
     }
   </style>
 </head>
@@ -825,7 +741,6 @@
     </header>
 
     <main>
-      <!-- Hero -->
       <section class="hero">
         <div class="hero-copy">
           <div class="tagline">
@@ -836,14 +751,13 @@
             Osorno <span class="hero-highlight">Battle</span>: el juego de la ciudad en Telegram
           </h1>
           <p class="hero-subtitle">
-            Completa misiones diarias, gana tokens y XP y compite con otros jugadores de Osorno. Todo sin salir de Telegram.
+            Completa misiones diarias, gana XP, AURA (nuevo) y recompensas y compite con otros jugadores de Osorno.
           </p>
           <p class="hero-microcopy">
-            Diseñado para que en menos de 15&nbsp;segundos entiendas qué es y hagas clic en "Jugar ahora en Telegram".
+            Descubre desafíos locales, gana experiencia y sube en el ranking de la ciudad.
           </p>
 
           <div class="hero-cta-row">
-            <!-- Cambia el enlace al handle de tu bot -->
             <a class="btn-primary" href="https://t.me/deosornobot" target="_blank" rel="noopener">
               <span class="icon">▶️</span>
               <span>Jugar ahora en Telegram</span>
@@ -854,7 +768,7 @@
           </div>
 
           <p class="hero-note">
-            <strong>Solo necesitas Telegram.</strong> Es gratuito, no instalas nada extra y puedes dejar el juego listo en un par de toques.
+            <strong>Solo necesitas Telegram.</strong> Abre el bot, pulsa “Iniciar” y comienza tu primera misión.
           </p>
         </div>
 
@@ -873,9 +787,9 @@
               </div>
 
               <div class="phone-message">
-                <strong>CriptoOsorno · Menú principal</strong>
+                <strong>Osorno Battle · Menú principal</strong>
                 <p>
-                  ¡Tu asistente diario está listo! Completa misiones, haz tu check‑in y entra a ligas con otros jugadores de Osorno.
+                  ¡Tu aventura está por comenzar! Completa misiones, haz tu check‑in y compite con otros jugadores de Osorno.
                 </p>
                 <ul class="phone-list">
                   <li>Misiones diarias y check‑in</li>
@@ -896,7 +810,6 @@
         </div>
       </section>
 
-      <!-- Qué es Osorno Battle -->
       <section id="que-es">
         <div class="section-card">
           <div class="section-header">
@@ -907,17 +820,15 @@
           </div>
           <div class="section-body">
             <p>
-              Osorno Battle es un juego de misiones y duelos ambientado en la ciudad de Osorno, pensado para jugarlo directamente dentro de Telegram. 
-              Cada día puedes hacer tu check‑in, completar retos y avanzar en tu progreso sin instalar aplicaciones nuevas.
+              Osorno Battle es un juego de misiones y duelos ambientado en la ciudad de Osorno, pensado para jugarlo directamente dentro de Telegram. Cada día puedes hacer tu check‑in, completar retos y avanzar en tu progreso sin instalar aplicaciones nuevas.
             </p>
             <p style="margin-top:6px;">
-              El objetivo es que cualquier persona de la ciudad entienda de inmediato que es un juego local, rápido de usar y conectado con su entorno: clima, noticias y eventos de Osorno.
+              Cada misión toma elementos de Osorno para que el juego se sienta cercano: lugares, cultura, actividades, deporte y acontecimientos de la ciudad.
             </p>
           </div>
         </div>
       </section>
 
-      <!-- Cómo funciona -->
       <section id="como-funciona">
         <div class="section-card">
           <div class="section-header">
@@ -931,21 +842,20 @@
               <div>
                 <p><strong>En menos de un minuto puedes estar jugando.</strong></p>
                 <ul class="bullet-list">
-                  <li><strong>1. Entra al bot en Telegram.</strong> Haz clic en "Jugar ahora en Telegram", se abrirá el bot y podrás usar <code>/start</code> para activar el juego.</li>
+                  <li><strong>1. Entra al bot en Telegram.</strong> Haz clic en “Jugar ahora en Telegram”, se abrirá el bot y podrás usar <code>/start</code> para activar el juego.</li>
                   <li><strong>2. Completa misiones y tu check‑in diario.</strong> Gana tokens y XP mientras mantienes tu racha y cumples retos.</li>
                   <li><strong>3. Sube de nivel y compite.</strong> Entra a duelos versus, avanza en el ranking semanal y participa en ligas con otros jugadores de Osorno.</li>
                 </ul>
               </div>
               <div>
-                <p><strong>Diseño pensado para conversión.</strong></p>
+                <p><strong>Empieza sin complicaciones.</strong></p>
                 <p style="margin-top:4px;">
-                  La página existe para una cosa: que el visitante haga clic en el botón y se convierta en jugador activo del bot. 
-                  Todo el texto y los botones están optimizados para claridad, velocidad y acción.
+                  La experiencia está pensada para que puedas comenzar rápidamente, sin formularios largos ni pasos innecesarios.
                 </p>
                 <div class="pill-row">
-                  <span class="pill highlight">Claridad en 15 segundos</span>
-                  <span class="pill">Enfoque total en "Jugar ahora"</span>
-                  <span class="pill">Sin fricción ni pasos ocultos</span>
+                  <span class="pill highlight">Comienza rápidamente</span>
+                  <span class="pill">Misiones desde Telegram</span>
+                  <span class="pill">Sin formularios largos</span>
                 </div>
               </div>
             </div>
@@ -953,7 +863,6 @@
         </div>
       </section>
 
-      <!-- Misiones y recompensas -->
       <section id="misiones">
         <div class="section-card">
           <div class="section-header">
@@ -967,23 +876,22 @@
               <div>
                 <p><strong>Lo que el jugador puede hacer dentro del bot.</strong></p>
                 <ul class="bullet-list">
-                  <li><strong>Check‑in diario.</strong> Asegura tu racha de juego, gana XP y mantén tu progreso vivo.</li>
+                  <li><strong>Check‑in diario.</strong> Mantén tu racha activa, gana XP y avanza en tu progreso.</li>
                   <li><strong>Misiones temáticas.</strong> Misiones de batalla, cultura, deporte y actividades relacionadas con Osorno.</li>
                   <li><strong>Duelos versus.</strong> Reta a otros jugadores, compite y demuestra tu nivel en enfrentamientos directos.</li>
-                  <li><strong>Tokens y XP.</strong> Gana recursos, sube de nivel y mejora tu posición en el ranking.</li>
+                  <li><strong>Tokens y XP.</strong> Gana recompensas del juego, sube de nivel y mejora tu posición en el ranking.</li>
                   <li><strong>Ranking y ligas.</strong> Participa en clasificaciones semanales y ligas para ver quién domina la ciudad.</li>
                 </ul>
               </div>
               <div>
                 <p><strong>Mensajes claros dentro del bot.</strong></p>
                 <p style="margin-top:4px;">
-                  Cada acción (check‑in, reclamo de recompensa, duelo) devuelve un mensaje de confirmación con saldo, XP y estado de la misión. 
-                  El jugador siempre sabe qué ganó, qué le falta y cuál es su próxima acción.
+                  Después de cada acción recibirás una confirmación con tu XP, tus recompensas y el estado de la misión. Así sabrás qué lograste y cuál es el siguiente desafío.
                 </p>
                 <div class="pill-row">
-                  <span class="pill">Feedback inmediato</span>
+                  <span class="pill">Confirmación inmediata</span>
                   <span class="pill">Progreso visible</span>
-                  <span class="pill">Motivación para volver cada día</span>
+                  <span class="pill">Nuevos desafíos cada día</span>
                 </div>
               </div>
             </div>
@@ -991,7 +899,6 @@
         </div>
       </section>
 
-      <!-- Comunidad / Eventos de Osorno -->
       <section id="comunidad">
         <div class="section-card">
           <div class="section-header">
@@ -1005,21 +912,20 @@
               <div>
                 <p><strong>Más que un juego: una experiencia local.</strong></p>
                 <ul class="bullet-list">
-                  <li>Resúmenes diarios con clima y noticias de Osorno, integrados en el mensaje de <code>/start</code>.</li>
+                  <li>Información y desafíos relacionados con el clima, las noticias y la actividad de Osorno.</li>
                   <li>Actividades inspiradas en eventos, cultura y deporte de la ciudad.</li>
                   <li>Espacio para torneos, desafíos especiales y campañas temáticas ligadas a fechas importantes.</li>
                 </ul>
               </div>
               <div>
-                <p><strong>Qué tipo de contenido se prioriza.</strong></p>
+                <p><strong>Contenido realmente local.</strong></p>
                 <p style="margin-top:4px;">
-                  El juego se centra en contenido realmente local: eventos culturales, actividades familiares, deporte, ferias y festivales. 
-                  Se evita mezclar noticias nacionales o temas que no tengan una relación clara con la ciudad de Osorno.
+                  Descubre misiones inspiradas en eventos culturales, actividades familiares, deporte, ferias y festivales de Osorno.
                 </p>
                 <div class="pill-row">
-                  <span class="pill highlight">Identidad local muy marcada</span>
-                  <span class="pill">Enfoque en comunidad</span>
-                  <span class="pill">Eventos como disparadores de misiones</span>
+                  <span class="pill highlight">Hecho para Osorno</span>
+                  <span class="pill">Desafíos de la comunidad</span>
+                  <span class="pill">Misiones inspiradas en eventos</span>
                 </div>
               </div>
             </div>
@@ -1027,16 +933,14 @@
         </div>
       </section>
 
-      <!-- CTA final -->
       <section>
         <div class="cta-section">
           <h2 class="cta-title">¿Listo para entrar a Osorno Battle?</h2>
           <p class="cta-subtitle">
-            Haz clic en el botón, abre el bot en Telegram y activa tu primera misión en menos de un minuto.
+            Abre el bot en Telegram, pulsa “Iniciar” y comienza tu primera misión.
           </p>
           <div class="cta-actions">
-            <!-- Usa el mismo enlace que en el hero -->
-            <a class="btn-primary" href="https://t.me/TU_BOT_DE_OSORNO" target="_blank" rel="noopener">
+            <a class="btn-primary" href="https://t.me/deosornobot" target="_blank" rel="noopener">
               <span class="icon">🎮</span>
               <span>Jugar en Telegram</span>
             </a>
@@ -1045,7 +949,7 @@
             </a>
           </div>
           <p class="cta-note">
-            <strong>Gratis y sin registro complejo.</strong> Si ya tienes Telegram, estás a un par de toques de convertirte en jugador de Osorno Battle.
+            <strong>Entra desde Telegram y comienza de inmediato.</strong>
           </p>
         </div>
       </section>
@@ -1064,10 +968,8 @@
   </div>
 
   <script>
-    // Año dinámico
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    // Intersection Observer para secciones
     const observer = new IntersectionObserver(
       entries => {
         entries.forEach(entry => {
@@ -1083,7 +985,6 @@
       observer.observe(card);
     });
 
-    // Partículas épicas en botones primarios
     const primaryButtons = document.querySelectorAll('.btn-primary');
 
     primaryButtons.forEach(btn => {
