@@ -161,10 +161,8 @@
 
     function shortestAngleDelta(current, previous) {
       let delta = current - previous;
-
       if (delta > 180) delta -= 360;
       if (delta < -180) delta += 360;
-
       return delta;
     }
 
@@ -173,15 +171,12 @@
       lastAlpha = null;
       lastBeta = null;
       lastGamma = null;
-
       accumulatedYaw = 0;
       accumulatedPitch = 0;
       accumulatedRoll = 0;
-
       targetYaw = 0;
       targetPitch = 0;
       targetRoll = 0;
-
       camera.rotation.set(0, 0, 0, 'YXZ');
       setStatus('Vista centrada. Mueve el teléfono suavemente.');
     }
@@ -207,8 +202,8 @@
       lastGamma = gamma;
 
       accumulatedYaw += THREE.MathUtils.degToRad(deltaAlpha);
-      accumulatedPitch += THREE.MathUtils.degToRad(deltaBeta);
-      accumulatedRoll += THREE.MathUtils.degToRad(deltaGamma);
+      accumulatedPitch -= THREE.MathUtils.degToRad(deltaBeta);
+      accumulatedRoll -= THREE.MathUtils.degToRad(deltaGamma);
 
       accumulatedPitch = THREE.MathUtils.clamp(
         accumulatedPitch,
@@ -224,7 +219,7 @@
 
       targetYaw = accumulatedYaw;
       targetPitch = accumulatedPitch;
-      targetRoll = -accumulatedRoll;
+      targetRoll = accumulatedRoll;
     }
 
     function onDeviceOrientation(event) {
@@ -233,7 +228,6 @@
 
     function attachBrowserOrientation() {
       if (orientationListening) return;
-
       addEventListener('deviceorientation', onDeviceOrientation, true);
       orientationListening = true;
     }
@@ -260,8 +254,6 @@
         });
       }
 
-      // El acelerómetro no controla el giro horizontal.
-      // Solo se inicia si Telegram lo ofrece.
       if (typeof accelerometer?.start === 'function') {
         try {
           accelerometer.start({ refresh_rate: 30 }, error => {
@@ -303,7 +295,6 @@
     function checkExit() {
       const direction = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
       const toDoor = door.position.clone().sub(camera.position).normalize();
-
       if (!found && direction.dot(toDoor) > .94) {
         found = true;
         success.classList.add('visible');
@@ -331,19 +322,12 @@
 
     renderer.domElement.addEventListener('pointermove', event => {
       if (!dragging) return;
-
       const deltaX = event.clientX - lastPointerX;
       const deltaY = event.clientY - lastPointerY;
-
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
-
       targetYaw -= deltaX * .006;
-      targetPitch = THREE.MathUtils.clamp(
-        targetPitch - deltaY * .006,
-        -Math.PI / 2.2,
-        Math.PI / 2.2
-      );
+      targetPitch = THREE.MathUtils.clamp(targetPitch - deltaY * .006, -Math.PI / 2.2, Math.PI / 2.2);
     });
 
     renderer.domElement.addEventListener('pointerup', event => {
@@ -357,15 +341,12 @@
 
     function animate() {
       requestAnimationFrame(animate);
-
       camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, targetPitch, .12);
       camera.rotation.y = THREE.MathUtils.lerp(camera.rotation.y, targetYaw, .12);
       camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, targetRoll, .12);
       camera.rotation.order = 'YXZ';
-
       key.rotation.y += .01;
       lamp.intensity = 16 + Math.sin(performance.now() * .002) * 2;
-
       checkExit();
       renderer.render(scene, camera);
     }
