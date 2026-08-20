@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Escape Room | Osorno Battle</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { color-scheme: dark; --ink: #eaf2ed; --muted: #9aaca2; --accent: #e8b85c; --line: rgba(234,242,237,.16); }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101817; color: var(--ink); font: 15px/1.4 Georgia, 'Times New Roman', serif; }
+    #scene { position: fixed; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .hud { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); pointer-events: none; }
+    .topbar, .bottom { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .title { margin: 0; font-size: clamp(22px, 4vw, 38px); letter-spacing: 0; font-weight: 400; text-shadow: 0 2px 18px #000; }
+    .eyebrow { margin: 0 0 4px; color: var(--accent); font: 11px/1.2 Arial, sans-serif; letter-spacing: 2px; text-transform: uppercase; }
+    .status { max-width: 260px; padding: 10px 12px; border: 1px solid var(--line); background: rgba(16,24,23,.7); color: var(--muted); font: 12px/1.3 Arial, sans-serif; }
+    .panel { max-width: 390px; padding: 16px 18px; border-left: 2px solid var(--accent); background: rgba(16,24,23,.76); box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+    .panel p { margin: 0 0 12px; }
+    .button { border: 1px solid var(--accent); padding: 10px 14px; background: var(--accent); color: #17211e; cursor: pointer; font: 700 12px Arial, sans-serif; text-transform: uppercase; letter-spacing: .7px; }
+    .button.secondary { border-color: var(--line); background: rgba(16,24,23,.75); color: var(--ink); }
+    .button:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+    .success { display: none; color: #b9e8c8; }
+    .success.visible { display: block; }
+    @media (max-width: 560px) { .topbar, .bottom { align-items: stretch; flex-direction: column; } .status { align-self: flex-start; } .panel { max-width: none; } }
+  </style>
+</head>
+<body>
+  <main id="scene" aria-label="Escena 3D del Escape Room"></main>
+  <section class="hud">
+    <div class="topbar">
+      <div><p class="eyebrow">Osorno Battle / Misión 04</p><h1 class="title">Escape Room</h1></div>
+      <div id="sensor-status" class="status">Sensores en espera</div>
+    </div>
+    <div class="bottom">
+      <div class="panel">
+        <p id="prompt">La puerta está oculta en la sala. Mira alrededor para encontrarla.</p>
+        <p id="success" class="success">Salida encontrada. Misión completada.</p>
+        <button id="sensor-button" class="button" type="button">Activar sensores</button>
+        <button id="exit-button" class="button secondary" type="button" hidden>Cerrar</button>
+      </div>
+    </div>
+  </section>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+
+    const telegram = window.Telegram?.WebApp;
+    telegram?.ready();
+    telegram?.expand();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101817);
+    scene.fog = new THREE.Fog(0x101817, 8, 25);
+    const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.1, 40);
+    camera.position.set(0, 1.65, 0);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.querySelector('#scene').appendChild(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xa8c2bb, 0x111513, 1.4));
+    const lamp = new THREE.PointLight(0xe8b85c, 18, 13, 2);
+    lamp.position.set(-2, 3.2, 1); scene.add(lamp);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), new THREE.MeshStandardMaterial({ color: 0x273531, roughness: .88 }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x34443f, roughness: .95 });
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(12, 5, .3), wallMaterial); backWall.position.set(0, 2.5, -6); scene.add(backWall);
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(.3, 5, 12), wallMaterial); leftWall.position.set(-6, 2.5, 0); scene.add(leftWall);
+    const rightWall = new THREE.Mesh(new THREE.BoxGeometry(.3, 5, 12), wallMaterial); rightWall.position.set(6, 2.5, 0); scene.add(rightWall);
+
+    const door = new THREE.Group();
+    const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(1.7, 3.1, .16), new THREE.MeshStandardMaterial({ color: 0x5a3831, roughness: .7 }));
+    doorMesh.position.y = 1.55; door.add(doorMesh);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.6, .25), new THREE.MeshStandardMaterial({ color: 0x171d1a, roughness: .8 }));
+    frame.position.set(0, 1.8, .08); door.add(frame);
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(.62, .24, .04), new THREE.MeshStandardMaterial({ color: 0xe8b85c, emissive: 0x5a3f15, emissiveIntensity: 1.3 }));
+    sign.position.set(0, 2.4, -.12); door.add(sign);
+    door.position.set(3.2, 0, -5.75); scene.add(door);
+    const key = new THREE.Mesh(new THREE.TorusGeometry(.15, .035, 10, 24), new THREE.MeshStandardMaterial({ color: 0xe8b85c, metalness: .7, roughness: .25 }));
+    key.position.set(-2.2, 1.2, -2.5); scene.add(key);
+
+    let yaw = 0, pitch = 0, targetYaw = 0, targetPitch = 0, found = false;
+    const status = document.querySelector('#sensor-status');
+    const button = document.querySelector('#sensor-button');
+    const exitButton = document.querySelector('#exit-button');
+    const setStatus = text => { status.textContent = text; };
+    const orientation = (alpha, beta, gamma) => {
+      targetYaw = THREE.MathUtils.degToRad(alpha || 0) * .35;
+      targetPitch = THREE.MathUtils.clamp(THREE.MathUtils.degToRad((beta || 0) - 45) * .22, -.45, .45);
+    };
+
+    function onDeviceOrientation(event) { orientation(event.alpha, event.beta, event.gamma); }
+    function startTelegramSensors() {
+      let started = false;
+      const sensor = telegram?.DeviceOrientation;
+      if (sensor?.start) { sensor.start({ refresh_rate: 30 }, () => {}); started = true; }
+      const accelerometer = telegram?.Accelerometer;
+      if (accelerometer?.start) { accelerometer.start({ refresh_rate: 30 }, () => {}); started = true; }
+      if (sensor?.onEvent) sensor.onEvent(data => orientation(data.alpha, data.beta, data.gamma));
+      if (accelerometer?.onEvent) accelerometer.onEvent(data => { targetPitch += THREE.MathUtils.clamp((data.y || 0) * .006, -.04, .04); });
+      return started;
+    }
+    async function enableSensors() {
+      try {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') await DeviceOrientationEvent.requestPermission();
+        const telegramStarted = startTelegramSensors();
+        addEventListener('deviceorientation', onDeviceOrientation, true);
+        setStatus(telegramStarted ? 'Sensores de Telegram activos' : 'Orientación del dispositivo activa');
+        button.textContent = 'Sensores activos'; button.disabled = true;
+      } catch (error) { setStatus('Permiso de sensores rechazado'); }
+    }
+    function checkExit() {
+      const direction = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
+      const toDoor = door.position.clone().sub(camera.position).normalize();
+      if (!found && direction.dot(toDoor) > .94) { found = true; document.querySelector('#success').classList.add('visible'); document.querySelector('#prompt').textContent = 'Has orientado la mirada hacia la puerta.'; exitButton.hidden = false; }
+    }
+    button.addEventListener('click', enableSensors);
+    exitButton.addEventListener('click', () => telegram?.close());
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+    addEventListener('pointermove', event => { if (event.pointerType === 'mouse') targetYaw += (event.movementX || 0) * .003; });
+    addEventListener('touchmove', event => { if (event.touches[0]) targetYaw += (event.touches[0].clientX - innerWidth / 2) * .00003; }, { passive: true });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      yaw = THREE.MathUtils.lerp(yaw, targetYaw, .08); pitch = THREE.MathUtils.lerp(pitch, targetPitch, .08);
+      camera.rotation.set(pitch, yaw, 0, 'YXZ'); key.rotation.y += .01; lamp.intensity = 16 + Math.sin(performance.now() * .002) * 2;
+      checkExit(); renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
