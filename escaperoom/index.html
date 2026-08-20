@@ -15,8 +15,8 @@
     .topbar, .bottom { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     .title { margin: 0; font-size: clamp(22px, 4vw, 38px); letter-spacing: 0; font-weight: 400; text-shadow: 0 2px 18px #000; }
     .eyebrow { margin: 0 0 4px; color: var(--accent); font: 11px/1.2 Arial, sans-serif; letter-spacing: 2px; text-transform: uppercase; }
-    .status { max-width: 260px; padding: 10px 12px; border: 1px solid var(--line); background: rgba(16,24,23,.7); color: var(--muted); font: 12px/1.3 Arial, sans-serif; pointer-events: auto; }
-    .panel { max-width: 390px; padding: 16px 18px; border-left: 2px solid var(--accent); background: rgba(16,24,23,.76); box-shadow: 0 8px 30px rgba(0,0,0,.25); pointer-events: auto; }
+    .status { max-width: 320px; padding: 10px 12px; border: 1px solid var(--line); background: rgba(16,24,23,.7); color: var(--muted); font: 12px/1.3 Arial, sans-serif; pointer-events: auto; }
+    .panel { max-width: 420px; padding: 16px 18px; border-left: 2px solid var(--accent); background: rgba(16,24,23,.76); box-shadow: 0 8px 30px rgba(0,0,0,.25); pointer-events: auto; }
     .panel p { margin: 0 0 12px; }
     .button { border: 1px solid var(--accent); padding: 10px 14px; background: var(--accent); color: #17211e; cursor: pointer; font: 700 12px Arial, sans-serif; text-transform: uppercase; letter-spacing: .7px; pointer-events: auto; touch-action: manipulation; }
     .button.secondary { border-color: var(--line); background: rgba(16,24,23,.75); color: var(--ink); }
@@ -24,6 +24,7 @@
     .button:focus-visible { outline: 2px solid white; outline-offset: 3px; }
     .success { display: none; color: #b9e8c8; }
     .success.visible { display: block; }
+    .help { color: var(--muted); font: 12px/1.35 Arial, sans-serif; }
     @media (max-width: 560px) { .topbar, .bottom { align-items: stretch; flex-direction: column; } .status { align-self: flex-start; } .panel { max-width: none; } }
   </style>
 </head>
@@ -37,8 +38,10 @@
     <div class="bottom">
       <div class="panel">
         <p id="prompt">La puerta está oculta en la sala. Mira alrededor para encontrarla.</p>
+        <p class="help">Mueve el teléfono para mirar arriba, abajo, izquierda, derecha y detrás. En computador puedes arrastrar el mouse.</p>
         <p id="success" class="success">Salida encontrada. Misión completada.</p>
         <button id="sensor-button" class="button" type="button">Activar sensores</button>
+        <button id="recenter-button" class="button secondary" type="button" hidden>Centrar vista</button>
         <button id="exit-button" class="button secondary" type="button" hidden>Cerrar</button>
       </div>
     </div>
@@ -57,89 +60,69 @@
 
     const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.1, 40);
     camera.position.set(0, 1.65, 0);
+    camera.rotation.order = 'YXZ';
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      powerPreference: 'high-performance'
-    });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.querySelector('#scene').appendChild(renderer.domElement);
 
     scene.add(new THREE.HemisphereLight(0xa8c2bb, 0x111513, 1.4));
-
     const lamp = new THREE.PointLight(0xe8b85c, 18, 13, 2);
     lamp.position.set(-2, 3.2, 1);
     scene.add(lamp);
 
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(22, 22),
-      new THREE.MeshStandardMaterial({ color: 0x273531, roughness: .88 })
-    );
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), new THREE.MeshStandardMaterial({ color: 0x273531, roughness: .88 }));
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x34443f, roughness: .95 });
-
     const backWall = new THREE.Mesh(new THREE.BoxGeometry(12, 5, .3), wallMaterial);
     backWall.position.set(0, 2.5, -6);
     scene.add(backWall);
-
     const leftWall = new THREE.Mesh(new THREE.BoxGeometry(.3, 5, 12), wallMaterial);
     leftWall.position.set(-6, 2.5, 0);
     scene.add(leftWall);
-
     const rightWall = new THREE.Mesh(new THREE.BoxGeometry(.3, 5, 12), wallMaterial);
     rightWall.position.set(6, 2.5, 0);
     scene.add(rightWall);
 
     const door = new THREE.Group();
-
-    const doorMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.7, 3.1, .16),
-      new THREE.MeshStandardMaterial({ color: 0x5a3831, roughness: .7 })
-    );
+    const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(1.7, 3.1, .16), new THREE.MeshStandardMaterial({ color: 0x5a3831, roughness: .7 }));
     doorMesh.position.y = 1.55;
     door.add(doorMesh);
-
-    const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 3.6, .25),
-      new THREE.MeshStandardMaterial({ color: 0x171d1a, roughness: .8 })
-    );
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.6, .25), new THREE.MeshStandardMaterial({ color: 0x171d1a, roughness: .8 }));
     frame.position.set(0, 1.8, .08);
     door.add(frame);
-
-    const sign = new THREE.Mesh(
-      new THREE.BoxGeometry(.62, .24, .04),
-      new THREE.MeshStandardMaterial({
-        color: 0xe8b85c,
-        emissive: 0x5a3f15,
-        emissiveIntensity: 1.3
-      })
-    );
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(.62, .24, .04), new THREE.MeshStandardMaterial({ color: 0xe8b85c, emissive: 0x5a3f15, emissiveIntensity: 1.3 }));
     sign.position.set(0, 2.4, -.12);
     door.add(sign);
-
     door.position.set(3.2, 0, -5.75);
     scene.add(door);
 
-    const key = new THREE.Mesh(
-      new THREE.TorusGeometry(.15, .035, 10, 24),
-      new THREE.MeshStandardMaterial({ color: 0xe8b85c, metalness: .7, roughness: .25 })
-    );
+    const key = new THREE.Mesh(new THREE.TorusGeometry(.15, .035, 10, 24), new THREE.MeshStandardMaterial({ color: 0xe8b85c, metalness: .7, roughness: .25 }));
     key.position.set(-2.2, 1.2, -2.5);
     scene.add(key);
 
     let yaw = 0;
     let pitch = 0;
+    let roll = 0;
     let targetYaw = 0;
     let targetPitch = 0;
+    let targetRoll = 0;
     let found = false;
     let orientationListening = false;
+    let orientationInitialized = false;
+    let initialAlpha = null;
+    let initialBeta = null;
+    let dragging = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
 
     const status = document.querySelector('#sensor-status');
     const button = document.querySelector('#sensor-button');
+    const recenterButton = document.querySelector('#recenter-button');
     const exitButton = document.querySelector('#exit-button');
     const success = document.querySelector('#success');
     const prompt = document.querySelector('#prompt');
@@ -148,17 +131,44 @@
       status.textContent = text;
     }
 
-    function orientation(alpha, beta) {
-      targetYaw = THREE.MathUtils.degToRad(alpha || 0) * .35;
+    function normalizeDegrees(value) {
+      return ((value + 180) % 360 + 360) % 360 - 180;
+    }
+
+    function orientation(alpha, beta, gamma) {
+      if (typeof alpha !== 'number' || typeof beta !== 'number' || typeof gamma !== 'number') return;
+
+      if (!orientationInitialized) {
+        initialAlpha = alpha;
+        initialBeta = beta;
+        orientationInitialized = true;
+        setStatus('Sensores activos. Mueve el teléfono para mirar alrededor.');
+      }
+
+      const relativeAlpha = normalizeDegrees(alpha - initialAlpha);
+      const relativeBeta = beta - initialBeta;
+
+      targetYaw = THREE.MathUtils.clamp(
+        THREE.MathUtils.degToRad(relativeAlpha),
+        -Math.PI,
+        Math.PI
+      );
+
       targetPitch = THREE.MathUtils.clamp(
-        THREE.MathUtils.degToRad((beta || 0) - 45) * .22,
-        -.45,
-        .45
+        THREE.MathUtils.degToRad(-relativeBeta),
+        -Math.PI / 2.2,
+        Math.PI / 2.2
+      );
+
+      targetRoll = THREE.MathUtils.clamp(
+        THREE.MathUtils.degToRad(-gamma) * .35,
+        -.35,
+        .35
       );
     }
 
     function onDeviceOrientation(event) {
-      orientation(event.alpha, event.beta);
+      orientation(event.alpha, event.beta, event.gamma);
     }
 
     function attachBrowserOrientation() {
@@ -185,9 +195,7 @@
       }
 
       if (typeof sensor?.onEvent === 'function') {
-        sensor.onEvent(data => {
-          orientation(data?.alpha, data?.beta);
-        });
+        sensor.onEvent(data => orientation(data?.alpha, data?.beta, data?.gamma));
       }
 
       if (typeof accelerometer?.start === 'function') {
@@ -203,15 +211,24 @@
 
       if (typeof accelerometer?.onEvent === 'function') {
         accelerometer.onEvent(data => {
-          targetPitch += THREE.MathUtils.clamp(
-            (data?.y || 0) * .006,
-            -.04,
-            .04
-          );
+          targetPitch += THREE.MathUtils.clamp((data?.y || 0) * .006, -.04, .04);
         });
       }
 
       return started;
+    }
+
+    function recenterView() {
+      orientationInitialized = false;
+      initialAlpha = null;
+      initialBeta = null;
+      targetYaw = 0;
+      targetPitch = 0;
+      targetRoll = 0;
+      yaw = 0;
+      pitch = 0;
+      roll = 0;
+      setStatus('Vista centrada. Mueve el teléfono para mirar alrededor.');
     }
 
     async function enableSensors() {
@@ -220,25 +237,18 @@
       setStatus('Solicitando acceso a los sensores...');
 
       try {
-        if (
-          typeof DeviceOrientationEvent !== 'undefined' &&
-          typeof DeviceOrientationEvent.requestPermission === 'function'
-        ) {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
           const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission !== 'granted') {
-            throw new Error('Permiso de sensores rechazado');
-          }
+          if (permission !== 'granted') throw new Error('Permiso de sensores rechazado');
         }
 
         attachBrowserOrientation();
         const telegramStarted = startTelegramSensors();
+        recenterView();
 
-        setStatus(
-          telegramStarted
-            ? 'Sensores de Telegram activos'
-            : 'Orientación del dispositivo activa'
-        );
+        setStatus(telegramStarted ? 'Sensores de Telegram activos' : 'Orientación del dispositivo activa');
         button.textContent = 'Sensores activos';
+        recenterButton.hidden = false;
       } catch (error) {
         console.error('No se pudieron activar los sensores:', error);
         setStatus(error.message || 'No se pudieron activar los sensores');
@@ -250,7 +260,6 @@
     function checkExit() {
       const direction = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
       const toDoor = door.position.clone().sub(camera.position).normalize();
-
       if (!found && direction.dot(toDoor) > .94) {
         found = true;
         success.classList.add('visible');
@@ -260,6 +269,7 @@
     }
 
     button.addEventListener('click', enableSensors);
+    recenterButton.addEventListener('click', recenterView);
     exitButton.addEventListener('click', () => telegram?.close());
 
     addEventListener('resize', () => {
@@ -268,23 +278,40 @@
       renderer.setSize(innerWidth, innerHeight);
     });
 
-    addEventListener('pointermove', event => {
-      if (event.pointerType === 'mouse') {
-        targetYaw += (event.movementX || 0) * .003;
+    renderer.domElement.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'mouse' || event.pointerType === 'touch') {
+        dragging = true;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+        renderer.domElement.setPointerCapture?.(event.pointerId);
       }
     });
 
-    addEventListener('touchmove', event => {
-      if (event.touches[0]) {
-        targetYaw += (event.touches[0].clientX - innerWidth / 2) * .00003;
-      }
-    }, { passive: true });
+    renderer.domElement.addEventListener('pointermove', event => {
+      if (!dragging) return;
+      const dx = event.clientX - lastPointerX;
+      const dy = event.clientY - lastPointerY;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      targetYaw -= dx * .006;
+      targetPitch = THREE.MathUtils.clamp(targetPitch - dy * .006, -Math.PI / 2.2, Math.PI / 2.2);
+    });
+
+    renderer.domElement.addEventListener('pointerup', event => {
+      dragging = false;
+      renderer.domElement.releasePointerCapture?.(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener('pointercancel', () => {
+      dragging = false;
+    });
 
     function animate() {
       requestAnimationFrame(animate);
-      yaw = THREE.MathUtils.lerp(yaw, targetYaw, .08);
-      pitch = THREE.MathUtils.lerp(pitch, targetPitch, .08);
-      camera.rotation.set(pitch, yaw, 0, 'YXZ');
+      yaw = THREE.MathUtils.lerp(yaw, targetYaw, .12);
+      pitch = THREE.MathUtils.lerp(pitch, targetPitch, .12);
+      roll = THREE.MathUtils.lerp(roll, targetRoll, .12);
+      camera.rotation.set(pitch, yaw, roll, 'YXZ');
       key.rotation.y += .01;
       lamp.intensity = 16 + Math.sin(performance.now() * .002) * 2;
       checkExit();
