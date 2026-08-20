@@ -38,7 +38,7 @@
     <div class="bottom">
       <div class="panel">
         <p id="prompt">La puerta está oculta en la sala. Mira alrededor para encontrarla.</p>
-        <p class="help">Mueve el teléfono para mirar en cualquier dirección. Puedes girar varias vueltas completas.</p>
+        <p class="help">Mueve el teléfono para mirar en cualquier dirección. Puedes cambiar entre vertical y horizontal.</p>
         <p id="success" class="success">Salida encontrada. Misión completada.</p>
         <button id="sensor-button" class="button" type="button">Activar sensores</button>
         <button id="recenter-button" class="button secondary" type="button" hidden>Centrar vista</button>
@@ -60,7 +60,6 @@
 
     const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.1, 40);
     camera.position.set(0, 1.65, 0);
-    camera.rotation.order = 'YXZ';
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -128,22 +127,26 @@
     key.position.set(-2.2, 1.2, -2.5);
     scene.add(key);
 
+    const zee = new THREE.Vector3(0, 0, 1);
+    const euler = new THREE.Euler();
+    const deviceQuaternion = new THREE.Quaternion();
+    const screenQuaternion = new THREE.Quaternion();
+    const cameraQuaternionTarget = new THREE.Quaternion();
+    const cameraQuaternionCurrent = new THREE.Quaternion();
+    const referenceQuaternion = new THREE.Quaternion();
+    const inverseReferenceQuaternion = new THREE.Quaternion();
+
+    const deviceCorrectionQuaternion = new THREE.Quaternion(
+      -Math.sqrt(0.5),
+      0,
+      0,
+      Math.sqrt(0.5)
+    );
+
     let found = false;
     let orientationListening = false;
-    let hasOrientation = false;
-
-    let lastAlpha = null;
-    let lastBeta = null;
-    let lastGamma = null;
-
-    let accumulatedYaw = 0;
-    let accumulatedPitch = 0;
-    let accumulatedRoll = 0;
-
-    let targetYaw = 0;
-    let targetPitch = 0;
-    let targetRoll = 0;
-
+    let referenceReady = false;
+    let lastScreenAngle = null;
     let dragging = false;
     let lastPointerX = 0;
     let lastPointerY = 0;
@@ -159,67 +162,58 @@
       status.textContent = text;
     }
 
-    function shortestAngleDelta(current, previous) {
-      let delta = current - previous;
-      if (delta > 180) delta -= 360;
-      if (delta < -180) delta += 360;
-      return delta;
+    function getScreenAngle() {
+      if (screen.orientation && typeof screen.orientation.angle === 'number') {
+        return THREE.MathUtils.degToRad(screen.orientation.angle);
+      }
+
+      if (typeof window.orientation === 'number') {
+        return THREE.MathUtils.degToRad(window.orientation);
+      }
+
+      return 0;
     }
 
-    function resetOrientationReference() {
-      hasOrientation = false;
-      lastAlpha = null;
-      lastBeta = null;
-      lastGamma = null;
-      accumulatedYaw = 0;
-      accumulatedPitch = 0;
-      accumulatedRoll = 0;
-      targetYaw = 0;
-      targetPitch = 0;
-      targetRoll = 0;
-      camera.rotation.set(0, 0, 0, 'YXZ');
-      setStatus('Vista centrada. Mueve el teléfono suavemente.');
+    function buildDeviceQuaternion(alpha, beta, gamma) {
+      euler.set(
+        THREE.MathUtils.degToRad(beta),
+        THREE.MathUtils.degToRad(alpha),
+        THREE.MathUtils.degToRad(-gamma),
+        'YXZ'
+      );
+
+      deviceQuaternion
+        .setFromEuler(euler)
+        .multiply(deviceCorrectionQuaternion);
+
+      screenQuaternion.setFromAxisAngle(
+        zee,
+        -getScreenAngle()
+      );
+
+      deviceQuaternion.multiply(screenQuaternion);
     }
 
     function updateOrientation(alpha, beta, gamma) {
       if (typeof alpha !== 'number' || typeof beta !== 'number' || typeof gamma !== 'number') return;
 
-      if (!hasOrientation) {
-        hasOrientation = true;
-        lastAlpha = alpha;
-        lastBeta = beta;
-        lastGamma = gamma;
-        setStatus('Sensores activos. Puedes girar varias vueltas.');
-        return;
+      buildDeviceQuaternion(alpha, beta, gamma);
+
+      const currentScreenAngle = getScreenAngle();
+      if (lastScreenAngle === null) lastScreenAngle = currentScreenAngle;
+
+      if (!referenceReady) {
+        referenceQuaternion.copy(deviceQuaternion);
+        inverseReferenceQuaternion.copy(referenceQuaternion).invert();
+        referenceReady = true;
+        setStatus('Sensores activos. Mueve el teléfono para mirar alrededor.');
       }
 
-      const deltaAlpha = shortestAngleDelta(alpha, lastAlpha);
-      const deltaBeta = beta - lastBeta;
-      const deltaGamma = gamma - lastGamma;
+      cameraQuaternionTarget
+        .copy(inverseReferenceQuaternion)
+        .multiply(deviceQuaternion);
 
-      lastAlpha = alpha;
-      lastBeta = beta;
-      lastGamma = gamma;
-
-      accumulatedYaw += THREE.MathUtils.degToRad(deltaAlpha);
-      accumulatedPitch -= THREE.MathUtils.degToRad(deltaBeta);
-      accumulatedRoll -= THREE.MathUtils.degToRad(deltaGamma);
-
-      accumulatedPitch = THREE.MathUtils.clamp(
-        accumulatedPitch,
-        -Math.PI / 2.2,
-        Math.PI / 2.2
-      );
-
-      accumulatedRoll = THREE.MathUtils.clamp(
-        accumulatedRoll,
-        -0.45,
-        0.45
-      );
-
-      targetYaw = accumulatedYaw;
-      targetPitch = accumulatedPitch;
-      targetRoll = accumulatedRoll;
+      lastScreenAngle = currentScreenAngle;
     }
 
     function onDeviceOrientation(event) {
@@ -235,7 +229,6 @@
     function startTelegramSensors() {
       let started = false;
       const sensor = telegram?.DeviceOrientation;
-      const accelerometer = telegram?.Accelerometer;
 
       if (typeof sensor?.start === 'function') {
         try {
@@ -254,17 +247,22 @@
         });
       }
 
-      if (typeof accelerometer?.start === 'function') {
-        try {
-          accelerometer.start({ refresh_rate: 30 }, error => {
-            if (error) console.warn('Error de Accelerometer:', error);
-          });
-        } catch (error) {
-          console.warn('No se pudo iniciar Accelerometer:', error);
-        }
-      }
-
       return started;
+    }
+
+    function resetOrientationReference() {
+      referenceReady = false;
+      lastScreenAngle = null;
+      cameraQuaternionTarget.identity();
+      cameraQuaternionCurrent.identity();
+      camera.quaternion.identity();
+      setStatus('Vista centrada. Mueve el teléfono suavemente.');
+    }
+
+    function handleScreenOrientationChange() {
+      if (!referenceReady) return;
+      referenceReady = false;
+      setStatus('Orientación de pantalla cambiada. Recentrando...');
     }
 
     async function enableSensors() {
@@ -293,8 +291,9 @@
     }
 
     function checkExit() {
-      const direction = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       const toDoor = door.position.clone().sub(camera.position).normalize();
+
       if (!found && direction.dot(toDoor) > .94) {
         found = true;
         success.classList.add('visible');
@@ -306,6 +305,12 @@
     button.addEventListener('click', enableSensors);
     recenterButton.addEventListener('click', resetOrientationReference);
     exitButton.addEventListener('click', () => telegram?.close());
+
+    if (screen.orientation) {
+      screen.orientation.addEventListener('change', handleScreenOrientationChange);
+    } else {
+      addEventListener('orientationchange', handleScreenOrientationChange);
+    }
 
     addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
@@ -322,12 +327,18 @@
 
     renderer.domElement.addEventListener('pointermove', event => {
       if (!dragging) return;
+
       const deltaX = event.clientX - lastPointerX;
       const deltaY = event.clientY - lastPointerY;
+
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
-      targetYaw -= deltaX * .006;
-      targetPitch = THREE.MathUtils.clamp(targetPitch - deltaY * .006, -Math.PI / 2.2, Math.PI / 2.2);
+
+      const manualRotation = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(-deltaY * .006, -deltaX * .006, 0, 'YXZ')
+      );
+
+      cameraQuaternionTarget.multiply(manualRotation);
     });
 
     renderer.domElement.addEventListener('pointerup', event => {
@@ -341,12 +352,17 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, targetPitch, .12);
-      camera.rotation.y = THREE.MathUtils.lerp(camera.rotation.y, targetYaw, .12);
-      camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, targetRoll, .12);
-      camera.rotation.order = 'YXZ';
+
+      cameraQuaternionCurrent.slerp(
+        cameraQuaternionTarget,
+        .16
+      );
+
+      camera.quaternion.copy(cameraQuaternionCurrent);
+
       key.rotation.y += .01;
       lamp.intensity = 16 + Math.sin(performance.now() * .002) * 2;
+
       checkExit();
       renderer.render(scene, camera);
     }
