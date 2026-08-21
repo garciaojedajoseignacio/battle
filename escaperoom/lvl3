@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>El Despacho del Detective | Osorno Battle</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { color-scheme: dark; --ink:#eee7d9; --muted:#b4ad9d; --accent:#c9a866; --line:rgba(238,231,217,.2); }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#111216; color:var(--ink); font:15px/1.4 Georgia,'Times New Roman',serif; }
+    #scene { position:fixed; inset:0; z-index:0; }
+    canvas { display:block; width:100%; height:100%; }
+    .hud { position:fixed; inset:0; z-index:2; display:flex; flex-direction:column; justify-content:space-between; padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom)); pointer-events:none; }
+    .topbar,.bottom { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+    .title { margin:0; font-size:clamp(22px,4vw,38px); font-weight:400; text-shadow:0 2px 18px #000; }
+    .eyebrow { margin:0 0 4px; color:var(--accent); font:11px/1.2 Arial,sans-serif; letter-spacing:2px; text-transform:uppercase; }
+    .status { max-width:360px; padding:10px 12px; border:1px solid var(--line); background:rgba(16,17,22,.86); color:var(--muted); font:12px/1.3 Arial,sans-serif; pointer-events:auto; }
+    .panel { max-width:450px; padding:16px 18px; border-left:2px solid var(--accent); background:rgba(16,17,22,.9); box-shadow:0 8px 30px rgba(0,0,0,.4); pointer-events:auto; }
+    .panel p { margin:0 0 12px; }
+    .help { color:var(--muted); font:12px/1.35 Arial,sans-serif; }
+    .button { border:1px solid var(--accent); padding:10px 14px; background:var(--accent); color:#17130c; cursor:pointer; font:700 12px Arial,sans-serif; letter-spacing:.7px; text-transform:uppercase; pointer-events:auto; touch-action:manipulation; }
+    .button.secondary { border-color:var(--line); background:rgba(16,17,22,.85); color:var(--ink); }
+    .button:disabled { cursor:wait; opacity:.65; }
+    .button:focus-visible { outline:2px solid white; outline-offset:3px; }
+    .success { display:none; color:#b9e8c8; }
+    .success.visible { display:block; }
+    .clue { display:none; padding:9px; border:1px solid rgba(201,168,102,.35); background:rgba(80,57,24,.24); color:#f1d79c; font:700 13px/1.35 Arial,sans-serif; }
+    .clue.visible { display:block; }
+    .keypad { display:none; margin-top:12px; }
+    .keypad.visible { display:block; }
+    .code-display { min-height:36px; margin-bottom:8px; padding:8px; border:1px solid var(--line); background:rgba(0,0,0,.3); color:var(--accent); font:700 20px/1.1 monospace; letter-spacing:6px; text-align:center; }
+    .keys { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .key-button { min-height:38px; border:1px solid var(--line); background:#2a2b31; color:var(--ink); cursor:pointer; font:700 16px Arial,sans-serif; }
+    .key-button:hover { background:#3c3d45; }
+    @media (max-width:560px) { .topbar,.bottom { align-items:stretch; flex-direction:column; } .status { align-self:flex-start; } .panel { max-width:none; } }
+  </style>
+</head>
+<body>
+  <main id="scene" aria-label="Despacho del detective en 3D"></main>
+  <section class="hud">
+    <div class="topbar">
+      <div><p class="eyebrow">Osorno Battle / Nivel 3</p><h1 class="title">El Despacho del Detective</h1></div>
+      <div id="sensor-status" class="status" role="status" aria-live="polite">Sensores en espera</div>
+    </div>
+    <div class="bottom">
+      <div class="panel">
+        <p id="prompt">Examina el archivo del caso y observa el reflejo junto al cuadro.</p>
+        <p class="help">Mueve el teléfono o arrastra con el dedo/mouse. Enfoca un objeto para que aparezca su acción.</p>
+        <p id="clue" class="clue"></p>
+        <p id="success" class="success">¡Caso resuelto! La puerta está desbloqueada.</p>
+        <button id="sensor-button" class="button" type="button">Activar sensores</button>
+        <button id="recenter-button" class="button secondary" type="button" hidden>Centrar vista</button>
+        <button id="action-button" class="button" type="button" hidden>Inspeccionar</button>
+        <div id="keypad" class="keypad" aria-label="Teclado de código">
+          <div id="code-display" class="code-display">____</div>
+          <div class="keys">
+            <button class="key-button" data-digit="1">1</button><button class="key-button" data-digit="2">2</button><button class="key-button" data-digit="3">3</button>
+            <button class="key-button" data-digit="4">4</button><button class="key-button" data-digit="5">5</button><button class="key-button" data-digit="6">6</button>
+            <button class="key-button" data-digit="7">7</button><button class="key-button" data-digit="8">8</button><button class="key-button" data-digit="9">9</button>
+            <button class="key-button" data-digit="0">0</button><button id="clear-code" class="key-button">Borrar</button><button id="submit-code" class="key-button">OK</button>
+          </div>
+        </div>
+        <button id="exit-button" class="button secondary" type="button" hidden>Cerrar</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+
+    const telegram = window.Telegram?.WebApp ?? null;
+    telegram?.ready();
+    telegram?.expand();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111216);
+    scene.fog = new THREE.Fog(0x111216, 7, 25);
+
+    const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, .1, 40);
+    camera.position.set(0, 1.65, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.querySelector('#scene').appendChild(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0x9698a6, 0x15100c, .5));
+    const deskLamp = new THREE.PointLight(0xffbd69, 18, 11, 2);
+    deskLamp.position.set(-1.4, 3.1, -1.3);
+    scene.add(deskLamp);
+    const ceiling = new THREE.PointLight(0xb9c5e8, 3, 13, 2);
+    ceiling.position.set(1, 4.5, -2);
+    scene.add(ceiling);
+
+    const wallpaper = new THREE.MeshStandardMaterial({ color:0x252432, roughness:.96 });
+    const woodFloor = new THREE.MeshStandardMaterial({ color:0x4a3022, roughness:.82 });
+    const wood = new THREE.MeshStandardMaterial({ color:0x5a3825, roughness:.78 });
+    const darkWood = new THREE.MeshStandardMaterial({ color:0x2b1b14, roughness:.9 });
+    const metal = new THREE.MeshStandardMaterial({ color:0x42434a, metalness:.78, roughness:.3 });
+    const brass = new THREE.MeshStandardMaterial({ color:0xc9a866, metalness:.65, roughness:.28, emissive:0x33250c, emissiveIntensity:.25 });
+    const paper = new THREE.MeshStandardMaterial({ color:0xd7cfb9, roughness:1 });
+    const glass = new THREE.MeshStandardMaterial({ color:0x5d7890, metalness:.15, roughness:.12, transparent:true, opacity:.7 });
+    const velvet = new THREE.MeshStandardMaterial({ color:0x4e1f26, roughness:.9 });
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(22,22), woodFloor);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(12,5,.3), wallpaper);
+    backWall.position.set(0,2.5,-6);
+    scene.add(backWall);
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(.3,5,12), wallpaper);
+    leftWall.position.set(-6,2.5,0);
+    scene.add(leftWall);
+    const rightWall = new THREE.Mesh(new THREE.BoxGeometry(.3,5,12), wallpaper);
+    rightWall.position.set(6,2.5,0);
+    scene.add(rightWall);
+    const ceilingMesh = new THREE.Mesh(new THREE.PlaneGeometry(12,12), darkWood);
+    ceilingMesh.rotation.x = Math.PI / 2;
+    ceilingMesh.position.y = 5;
+    scene.add(ceilingMesh);
+
+    const desk = new THREE.Group();
+    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(3.2,.22,1.5), wood);
+    deskTop.position.y = 1.35;
+    desk.add(deskTop);
+    for (const x of [-1.25,1.25]) for (const z of [-.55,.55]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.2,1.35,.2), darkWood);
+      leg.position.set(x,.68,z);
+      desk.add(leg);
+    }
+    const deskDrawer = new THREE.Group();
+    const drawerFace = new THREE.Mesh(new THREE.BoxGeometry(1.25,.34,.12), wood);
+    drawerFace.position.set(0,1.04,.77);
+    deskDrawer.add(drawerFace);
+    const drawerHandle = new THREE.Mesh(new THREE.TorusGeometry(.1,.025,8,16), brass);
+    drawerHandle.rotation.x = Math.PI / 2;
+    drawerHandle.position.set(0,1.04,.84);
+    deskDrawer.add(drawerHandle);
+    desk.add(deskDrawer);
+    desk.position.set(-2.25,0,-2.5);
+    scene.add(desk);
+
+    const fileGroup = new THREE.Group();
+    const file = new THREE.Mesh(new THREE.BoxGeometry(1.3,.12,.9), paper);
+    file.position.y = 1.53;
+    fileGroup.add(file);
+    const fileBand = new THREE.Mesh(new THREE.BoxGeometry(.12,.14,.92), velvet);
+    fileBand.position.set(-.35,1.61,0);
+    fileGroup.add(fileBand);
+    const fileMark = new THREE.Mesh(new THREE.BoxGeometry(.48,.02,.18), velvet);
+    fileMark.position.set(.2,1.61,.01);
+    fileGroup.add(fileMark);
+    fileGroup.position.set(-2.25,0,-2.5);
+    scene.add(fileGroup);
+
+    const shelf = new THREE.Group();
+    const shelfBody = new THREE.Mesh(new THREE.BoxGeometry(2.5,3.5,.5), darkWood);
+    shelfBody.position.y = 1.75;
+    shelf.add(shelfBody);
+    for (const y of [.8,1.65,2.5]) {
+      const shelfBoard = new THREE.Mesh(new THREE.BoxGeometry(2.25,.1,.7), wood);
+      shelfBoard.position.set(0,y,.25);
+      shelf.add(shelfBoard);
+    }
+    for (const y of [1.05,1.9,2.75]) {
+      const report = new THREE.Mesh(new THREE.BoxGeometry(.65,.5,.08), paper);
+      report.position.set(-.35,y,.31);
+      shelf.add(report);
+      const folder = new THREE.Mesh(new THREE.BoxGeometry(.5,.55,.1), velvet);
+      folder.position.set(.45,y,.3);
+      shelf.add(folder);
+    }
+    shelf.position.set(-4.25,0,-5.62);
+    scene.add(shelf);
+
+    const picture = new THREE.Group();
+    const portrait = new THREE.Mesh(new THREE.BoxGeometry(1.7,2.05,.05), paper);
+    picture.add(portrait);
+    const pictureFrame = new THREE.Mesh(new THREE.BoxGeometry(1.95,2.3,.12), brass);
+    pictureFrame.position.z = .06;
+    picture.add(pictureFrame);
+    picture.position.set(1,3.45,-5.75);
+    scene.add(picture);
+
+    const mirror = new THREE.Group();
+    const mirrorSurface = new THREE.Mesh(new THREE.BoxGeometry(1.25,1.5,.04), glass);
+    mirror.add(mirrorSurface);
+    const mirrorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.48,1.73,.1), darkWood);
+    mirrorFrame.position.z = .05;
+    mirror.add(mirrorFrame);
+    const reflectionMark = new THREE.Mesh(new THREE.BoxGeometry(.5,.12,.03), brass);
+    reflectionMark.position.set(.18,.15,.1);
+    mirror.add(reflectionMark);
+    mirror.position.set(3.1,3.25,-5.75);
+    scene.add(mirror);
+
+    const cabinet = new THREE.Group();
+    const cabinetBody = new THREE.Mesh(new THREE.BoxGeometry(1.75,2.3,.9), wood);
+    cabinetBody.position.y = 1.15;
+    cabinet.add(cabinetBody);
+    const cabinetDoor = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.9,.08), darkWood);
+    cabinetDoor.position.set(0,1.1,.48);
+    cabinet.add(cabinetDoor);
+    const lock = new THREE.Mesh(new THREE.BoxGeometry(.22,.3,.08), brass);
+    lock.position.set(0,1.15,.55);
+    cabinet.add(lock);
+    cabinet.position.set(3.4,0,-2.7);
+    scene.add(cabinet);
+
+    const uvGroup = new THREE.Group();
+    const uvBody = new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.75,16), metal);
+    uvBody.rotation.z = Math.PI / 2;
+    uvGroup.add(uvBody);
+    const uvLens = new THREE.Mesh(new THREE.SphereGeometry(.14,12,8), new THREE.MeshStandardMaterial({ color:0x8d78ff, emissive:0x5d32c8, emissiveIntensity:2 }));
+    uvLens.position.x = .43;
+    uvGroup.add(uvLens);
+    uvGroup.position.set(3.4,2.7,-2.7);
+    uvGroup.visible = false;
+    scene.add(uvGroup);
+
+    const notebook = new THREE.Group();
+    const paperSheet = new THREE.Mesh(new THREE.BoxGeometry(1.05,.06,.75), paper);
+    notebook.add(paperSheet);
+    const hiddenInk = new THREE.Mesh(new THREE.BoxGeometry(.56,.012,.16), new THREE.MeshStandardMaterial({ color:0x8f65e8, emissive:0x6239b4, emissiveIntensity:1.6 }));
+    hiddenInk.position.set(.06,.045,.02);
+    hiddenInk.visible = false;
+    notebook.add(hiddenInk);
+    notebook.position.set(-1.9,1.55,-2.1);
+    scene.add(notebook);
+
+    const door = new THREE.Group();
+    const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(1.8,3.4,.18), darkWood);
+    doorMesh.position.y = 1.7;
+    door.add(doorMesh);
+    const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(2.3,3.9,.25), metal);
+    doorFrame.position.set(0,1.95,.08);
+    door.add(doorFrame);
+    const doorSign = new THREE.Mesh(new THREE.BoxGeometry(.7,.25,.04), brass);
+    doorSign.position.set(0,2.65,-.13);
+    door.add(doorSign);
+    const handle = new THREE.Mesh(new THREE.SphereGeometry(.09,12,8), brass);
+    handle.position.set(.55,1.65,-.16);
+    door.add(handle);
+    door.position.set(3.9,0,-5.75);
+    scene.add(door);
+
+    const objects = { file:fileGroup, mirror, cabinet, uv:uvGroup, notebook, door };
+    const gameState = { step:1, combination:'1947', hasUV:false, uvUsed:false, secretCode:'5826', enteredCode:'' };
+
+    const zee = new THREE.Vector3(0,0,1);
+    const euler = new THREE.Euler();
+    const deviceQuaternion = new THREE.Quaternion();
+    const screenQuaternion = new THREE.Quaternion();
+    const cameraQuaternionTarget = new THREE.Quaternion();
+    const cameraQuaternionCurrent = new THREE.Quaternion();
+    const referenceQuaternion = new THREE.Quaternion();
+    const inverseReferenceQuaternion = new THREE.Quaternion();
+    const deviceCorrectionQuaternion = new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));
+
+    let referenceReady = false;
+    let orientationListening = false;
+    let dragging = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let actionCooldown = false;
+
+    const focusRaycaster = new THREE.Raycaster();
+    const focusOrigin = new THREE.Vector3();
+    const focusDirection = new THREE.Vector3();
+    const focusMeshes = [];
+    const focusPoint = new THREE.Vector3();
+
+    const status = document.querySelector('#sensor-status');
+    const sensorButton = document.querySelector('#sensor-button');
+    const recenterButton = document.querySelector('#recenter-button');
+    const actionButton = document.querySelector('#action-button');
+    const exitButton = document.querySelector('#exit-button');
+    const success = document.querySelector('#success');
+    const prompt = document.querySelector('#prompt');
+    const clue = document.querySelector('#clue');
+    const keypad = document.querySelector('#keypad');
+    const codeDisplay = document.querySelector('#code-display');
+
+    function setStatus(text) { status.textContent = text; }
+    function getScreenAngle() {
+      if (screen.orientation && typeof screen.orientation.angle === 'number') return THREE.MathUtils.degToRad(screen.orientation.angle);
+      if (typeof window.orientation === 'number') return THREE.MathUtils.degToRad(window.orientation);
+      return 0;
+    }
+    function buildDeviceQuaternion(alpha,beta,gamma) {
+      euler.set(THREE.MathUtils.degToRad(beta),THREE.MathUtils.degToRad(alpha),THREE.MathUtils.degToRad(-gamma),'YXZ');
+      deviceQuaternion.setFromEuler(euler).multiply(deviceCorrectionQuaternion);
+      screenQuaternion.setFromAxisAngle(zee,-getScreenAngle());
+      deviceQuaternion.multiply(screenQuaternion);
+    }
+    function updateOrientation(alpha,beta,gamma) {
+      if (typeof alpha !== 'number' || typeof beta !== 'number' || typeof gamma !== 'number') return;
+      buildDeviceQuaternion(alpha,beta,gamma);
+      if (!referenceReady) {
+        referenceQuaternion.copy(deviceQuaternion);
+        inverseReferenceQuaternion.copy(referenceQuaternion).invert();
+        referenceReady = true;
+        setStatus('Sensores activos. Inspecciona las pistas.');
+      }
+      cameraQuaternionTarget.copy(inverseReferenceQuaternion).multiply(deviceQuaternion);
+    }
+    function onDeviceOrientation(event) { updateOrientation(event.alpha,event.beta,event.gamma); }
+    function attachBrowserOrientation() {
+      if (orientationListening) return;
+      addEventListener('deviceorientation',onDeviceOrientation,true);
+      orientationListening = true;
+    }
+    function startTelegramSensors() {
+      let started = false;
+      const sensor = telegram?.DeviceOrientation;
+      if (typeof sensor?.start === 'function') {
+        try { sensor.start({refresh_rate:30},error => error && console.warn(error)); started = true; } catch (error) { console.warn(error); }
+      }
+      if (typeof sensor?.onEvent === 'function') sensor.onEvent(data => updateOrientation(data?.alpha,data?.beta,data?.gamma));
+      return started;
+    }
+    function resetOrientationReference() {
+      referenceReady = false;
+      cameraQuaternionTarget.identity();
+      cameraQuaternionCurrent.identity();
+      camera.quaternion.identity();
+      setStatus('Vista centrada. Mueve el teléfono suavemente.');
+    }
+    async function enableSensors() {
+      sensorButton.disabled = true;
+      sensorButton.textContent = 'Solicitando permiso...';
+      setStatus('Solicitando acceso a los sensores...');
+      try {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission !== 'granted') throw new Error('Permiso de sensores rechazado');
+        }
+        attachBrowserOrientation();
+        startTelegramSensors();
+        resetOrientationReference();
+        sensorButton.textContent = 'Sensores activos';
+        recenterButton.hidden = false;
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message || 'No se pudieron activar los sensores');
+        sensorButton.disabled = false;
+        sensorButton.textContent = 'Reintentar sensores';
+      }
+    }
+    function getFocusMeshes(object) {
+      focusMeshes.length = 0;
+      object.traverse(child => {
+        if (child.isMesh && child.visible) focusMeshes.push(child);
+      });
+      return focusMeshes;
+    }
+    function focusObject(object, maxDistance = 9) {
+      scene.updateMatrixWorld(true);
+      camera.getWorldPosition(focusOrigin);
+      camera.getWorldDirection(focusDirection);
+      focusRaycaster.set(focusOrigin, focusDirection);
+      const meshes = getFocusMeshes(object);
+      if (!meshes.length) return false;
+      const intersections = focusRaycaster.intersectObjects(meshes, false);
+      return intersections.length > 0 && intersections[0].distance <= maxDistance;
+    }
+    function message(text) { prompt.textContent = text; }
+    function updateAction() {
+      actionButton.hidden = true;
+      keypad.classList.remove('visible');
+
+      if (gameState.step === 1 && focusObject(objects.file)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Examinar archivo';
+        return;
+      }
+      if (gameState.step === 1.5 && focusObject(objects.mirror)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Observar reflejo';
+        return;
+      }
+      if (gameState.step === 2 && focusObject(objects.cabinet)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Abrir candado';
+        return;
+      }
+      if (gameState.step === 3 && focusObject(objects.uv)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Tomar luz UV';
+        return;
+      }
+      if (gameState.step === 4 && focusObject(objects.notebook)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Iluminar libreta';
+        return;
+      }
+      if (gameState.step === 5 && focusObject(objects.door)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Introducir código';
+        keypad.classList.add('visible');
+      }
+    }
+    function performAction() {
+      if (actionCooldown) return;
+      actionCooldown = true;
+      setTimeout(() => actionCooldown = false, 300);
+
+      if (gameState.step === 1 && focusObject(objects.file)) {
+        gameState.step = 1.5;
+        clue.textContent = 'Pista del archivo: 19–47. Ahora observa el reflejo junto al cuadro.';
+        clue.classList.add('visible');
+        message('El informe revela una fecha: 1947. Enfoca el espejo junto al cuadro.');
+        updateAction();
+        return;
+      }
+      if (gameState.step === 1.5 && focusObject(objects.mirror)) {
+        gameState.step = 2;
+        clue.textContent = 'Combinación del candado: 1947.';
+        message('El reflejo confirma la combinación. Enfoca el mueble con candado.');
+        updateAction();
+        return;
+      }
+      if (gameState.step === 2 && focusObject(objects.cabinet)) {
+        const answer = window.prompt('Introduce la combinación del candado:');
+        if (answer === gameState.combination) {
+          gameState.step = 3;
+          gameState.hasUV = true;
+          uvGroup.visible = true;
+          cabinetDoor.material = wood;
+          message('Candado abierto. Has encontrado una luz UV. Busca la libreta.');
+        } else {
+          message('Combinación incorrecta. Usa la fecha 1947.');
+        }
+        updateAction();
+        return;
+      }
+      if (gameState.step === 3 && focusObject(objects.uv)) {
+        gameState.step = 4;
+        message('Luz UV obtenida. Enfoca la libreta aparentemente en blanco.');
+        updateAction();
+        return;
+      }
+      if (gameState.step === 4 && gameState.hasUV && focusObject(objects.notebook)) {
+        gameState.step = 5;
+        gameState.uvUsed = true;
+        hiddenInk.visible = true;
+        clue.textContent = 'La luz ultravioleta revela el código secreto: 5826.';
+        clue.classList.add('visible');
+        message('La tinta invisible aparece. Enfoca la puerta e introduce el código.');
+        updateAction();
+        return;
+      }
+      if (gameState.step === 5 && focusObject(objects.door)) {
+        keypad.classList.add('visible');
+        message('Introduce el código secreto de cuatro dígitos.');
+        updateAction();
+      }
+    }
+    function updateCodeDisplay() { codeDisplay.textContent = gameState.enteredCode.padEnd(4,'_'); }
+    function submitCode() {
+      if (gameState.enteredCode.length !== 4) { message('El código debe tener cuatro dígitos.'); return; }
+      if (gameState.enteredCode === gameState.secretCode) {
+        gameState.step = 6;
+        doorMesh.material = new THREE.MeshStandardMaterial({ color:0x668d62, roughness:.65 });
+        success.classList.add('visible');
+        message('¡Código correcto! El despacho queda resuelto. Puedes salir.');
+        exitButton.hidden = false;
+        keypad.classList.remove('visible');
+        actionButton.hidden = true;
+      } else {
+        gameState.enteredCode = '';
+        updateCodeDisplay();
+        message('Código incorrecto. Revisa la revelación UV e inténtalo otra vez.');
+      }
+    }
+
+    sensorButton.addEventListener('click', enableSensors);
+    recenterButton.addEventListener('click', resetOrientationReference);
+    actionButton.addEventListener('click', performAction);
+    exitButton.addEventListener('click', () => telegram?.close());
+    document.querySelectorAll('[data-digit]').forEach(element => element.addEventListener('click', () => { if (gameState.enteredCode.length < 4) gameState.enteredCode += element.dataset.digit; updateCodeDisplay(); }));
+    document.querySelector('#clear-code').addEventListener('click', () => { gameState.enteredCode = ''; updateCodeDisplay(); });
+    document.querySelector('#submit-code').addEventListener('click', submitCode);
+
+    if (screen.orientation) screen.orientation.addEventListener('change', () => { if (referenceReady) referenceReady = false; });
+    else addEventListener('orientationchange', () => { if (referenceReady) referenceReady = false; });
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    renderer.domElement.addEventListener('pointerdown', event => { dragging = true; lastPointerX = event.clientX; lastPointerY = event.clientY; renderer.domElement.setPointerCapture?.(event.pointerId); });
+    renderer.domElement.addEventListener('pointermove', event => {
+      if (!dragging) return;
+      const dx = event.clientX - lastPointerX;
+      const dy = event.clientY - lastPointerY;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-dy * .006, -dx * .006, 0, 'YXZ'));
+      cameraQuaternionTarget.multiply(q);
+    });
+    renderer.domElement.addEventListener('pointerup', event => { dragging = false; renderer.domElement.releasePointerCapture?.(event.pointerId); });
+    renderer.domElement.addEventListener('pointercancel', () => { dragging = false; });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      cameraQuaternionCurrent.slerp(cameraQuaternionTarget, .16);
+      camera.quaternion.copy(cameraQuaternionCurrent);
+      deskLamp.intensity = 16 + Math.sin(performance.now() * .003) * 2;
+      updateAction();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
