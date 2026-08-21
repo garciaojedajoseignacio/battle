@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Misión Pirata | Osorno Battle</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { color-scheme: dark; --ink:#f5ead3; --muted:#c6b38e; --accent:#d6a84f; --danger:#d9825b; --line:rgba(245,234,211,.2); }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#17100b; color:var(--ink); font:15px/1.4 Georgia,'Times New Roman',serif; }
+    #scene { position:fixed; inset:0; z-index:0; }
+    canvas { display:block; width:100%; height:100%; }
+    .hud { position:fixed; inset:0; z-index:2; display:flex; flex-direction:column; justify-content:space-between; padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom)); pointer-events:none; }
+    .topbar,.bottom { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+    .title { margin:0; font-size:clamp(22px,4vw,38px); font-weight:400; text-shadow:0 2px 18px #000; }
+    .eyebrow { margin:0 0 4px; color:var(--accent); font:11px/1.2 Arial,sans-serif; letter-spacing:2px; text-transform:uppercase; }
+    .status { max-width:340px; padding:10px 12px; border:1px solid var(--line); background:rgba(28,17,9,.82); color:var(--muted); font:12px/1.3 Arial,sans-serif; pointer-events:auto; }
+    .panel { max-width:440px; padding:16px 18px; border-left:2px solid var(--accent); background:rgba(28,17,9,.86); box-shadow:0 8px 30px rgba(0,0,0,.35); pointer-events:auto; }
+    .panel p { margin:0 0 12px; }
+    .help { color:var(--muted); font:12px/1.35 Arial,sans-serif; }
+    .button { border:1px solid var(--accent); padding:10px 14px; background:var(--accent); color:#24170a; cursor:pointer; font:700 12px Arial,sans-serif; letter-spacing:.7px; text-transform:uppercase; pointer-events:auto; touch-action:manipulation; }
+    .button.secondary { border-color:var(--line); background:rgba(28,17,9,.8); color:var(--ink); }
+    .button:disabled { cursor:wait; opacity:.65; }
+    .button:focus-visible { outline:2px solid white; outline-offset:3px; }
+    .success { display:none; color:#b9e8c8; }
+    .success.visible { display:block; }
+    .keypad { display:none; margin-top:12px; }
+    .keypad.visible { display:block; }
+    .code-display { min-height:36px; margin-bottom:8px; padding:8px; border:1px solid var(--line); background:rgba(0,0,0,.28); color:var(--accent); font:700 20px/1.1 monospace; letter-spacing:6px; text-align:center; }
+    .keys { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .key-button { min-height:38px; border:1px solid var(--line); background:#3b2514; color:var(--ink); cursor:pointer; font:700 16px Arial,sans-serif; }
+    .key-button:hover { background:#5a371b; }
+    .key-button.wide { grid-column:span 3; }
+    @media (max-width:560px) { .topbar,.bottom { align-items:stretch; flex-direction:column; } .status { align-self:flex-start; } .panel { max-width:none; } }
+  </style>
+</head>
+<body>
+  <main id="scene" aria-label="Camarote pirata 3D de la Misión Pirata"></main>
+  <section class="hud">
+    <div class="topbar">
+      <div><p class="eyebrow">Osorno Battle / Nivel 2</p><h1 class="title">Misión Pirata</h1></div>
+      <div id="sensor-status" class="status" role="status" aria-live="polite">Sensores en espera</div>
+    </div>
+    <div class="bottom">
+      <div class="panel">
+        <p id="prompt">Inspecciona el mapa de la pared para encontrar la primera pista.</p>
+        <p class="help">Mueve el teléfono o arrastra con el dedo/mouse para mirar. Cuando un objeto esté enfocado, aparecerá la acción correspondiente.</p>
+        <p id="success" class="success">¡Tesoro encontrado! Misión completada.</p>
+        <button id="sensor-button" class="button" type="button">Activar sensores</button>
+        <button id="recenter-button" class="button secondary" type="button" hidden>Centrar vista</button>
+        <button id="action-button" class="button" type="button" hidden>Inspeccionar</button>
+        <div id="keypad" class="keypad" aria-label="Teclado de código">
+          <div id="code-display" class="code-display">____</div>
+          <div class="keys">
+            <button class="key-button" data-digit="1">1</button><button class="key-button" data-digit="2">2</button><button class="key-button" data-digit="3">3</button>
+            <button class="key-button" data-digit="4">4</button><button class="key-button" data-digit="5">5</button><button class="key-button" data-digit="6">6</button>
+            <button class="key-button" data-digit="7">7</button><button class="key-button" data-digit="8">8</button><button class="key-button" data-digit="9">9</button>
+            <button class="key-button" data-digit="0">0</button><button id="clear-code" class="key-button">Borrar</button><button id="submit-code" class="key-button">OK</button>
+          </div>
+        </div>
+        <button id="exit-button" class="button secondary" type="button" hidden>Cerrar</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+
+    const telegram = window.Telegram?.WebApp ?? null;
+    telegram?.ready();
+    telegram?.expand();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x17100b);
+    scene.fog = new THREE.Fog(0x17100b, 7, 24);
+
+    const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, .1, 40);
+    camera.position.set(0, 1.65, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.querySelector('#scene').appendChild(renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xc69b65, 0x1b0e07, .72));
+    const torch = new THREE.PointLight(0xff9b38, 22, 14, 2);
+    torch.position.set(-2.2, 3.1, 1.5);
+    scene.add(torch);
+    const fill = new THREE.PointLight(0xc46b33, 5, 10, 2);
+    fill.position.set(3, 2, -3);
+    scene.add(fill);
+
+    const wood = new THREE.MeshStandardMaterial({ color:0x51301b, roughness:.88 });
+    const darkWood = new THREE.MeshStandardMaterial({ color:0x28150b, roughness:.92 });
+    const metal = new THREE.MeshStandardMaterial({ color:0x4a3522, metalness:.8, roughness:.3 });
+    const gold = new THREE.MeshStandardMaterial({ color:0xd6a84f, metalness:.65, roughness:.28, emissive:0x3b260c, emissiveIntensity:.35 });
+    const parchment = new THREE.MeshStandardMaterial({ color:0xb58b51, roughness:1 });
+    const red = new THREE.MeshStandardMaterial({ color:0x8e3027, roughness:.8 });
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(22,22), darkWood);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(12,5,.3), wood);
+    backWall.position.set(0,2.5,-6);
+    scene.add(backWall);
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(.3,5,12), wood);
+    leftWall.position.set(-6,2.5,0);
+    scene.add(leftWall);
+    const rightWall = new THREE.Mesh(new THREE.BoxGeometry(.3,5,12), wood);
+    rightWall.position.set(6,2.5,0);
+    scene.add(rightWall);
+
+    function addPlankLines() {
+      for (let y = .35; y < 5; y += .8) {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(11.7,.025,.012), darkWood);
+        line.position.set(0,y,-5.83);
+        scene.add(line);
+      }
+    }
+    addPlankLines();
+
+    const table = new THREE.Group();
+    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2.8,.22,1.35), wood);
+    tableTop.position.y = 1.35;
+    table.add(tableTop);
+    for (const x of [-1.1, 1.1]) for (const z of [-.45, .45]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.18,1.35,.18), darkWood);
+      leg.position.set(x,.67,z);
+      table.add(leg);
+    }
+    const drawer = new THREE.Group();
+    const drawerFace = new THREE.Mesh(new THREE.BoxGeometry(1.25,.34,.12), wood);
+    drawerFace.position.set(0,1.02,.69);
+    drawer.add(drawerFace);
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(.1,.025,8,16), metal);
+    handle.rotation.x = Math.PI / 2;
+    handle.position.set(0,1.02,.78);
+    drawer.add(handle);
+    table.add(drawer);
+    table.position.set(-3.2,0,-2.7);
+    scene.add(table);
+
+    const mapGroup = new THREE.Group();
+    const map = new THREE.Mesh(new THREE.BoxGeometry(2.1,1.35,.06), parchment);
+    mapGroup.add(map);
+    const mapFrame = new THREE.Mesh(new THREE.BoxGeometry(2.35,1.6,.1), darkWood);
+    mapFrame.position.z = .05;
+    mapGroup.add(mapFrame);
+    const mapMark = new THREE.Mesh(new THREE.TorusGeometry(.22,.035,8,20), red);
+    mapMark.position.set(.4,.15,.1);
+    mapGroup.add(mapMark);
+    mapGroup.position.set(-2.3,3.2,-5.78);
+    scene.add(mapGroup);
+
+    const chest = new THREE.Group();
+    const chestBase = new THREE.Mesh(new THREE.BoxGeometry(1.8,1.05,1.2), wood);
+    chestBase.position.y = .55;
+    chest.add(chestBase);
+    const bands = [-.55, .55].map(x => {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(.12,1.12,1.25), metal);
+      band.position.set(x,.55,0);
+      chest.add(band);
+      return band;
+    });
+    const lidPivot = new THREE.Group();
+    lidPivot.position.set(0,1.08,-.6);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.8,.65,1.2), wood);
+    lid.position.set(0,.32,.6);
+    lid.rotation.x = 0;
+    lidPivot.add(lid);
+    chest.add(lidPivot);
+    const lock = new THREE.Mesh(new THREE.BoxGeometry(.28,.36,.08), gold);
+    lock.position.set(0,.68,.66);
+    chest.add(lock);
+    chest.position.set(3.1,0,-2.6);
+    scene.add(chest);
+
+    const key = new THREE.Mesh(new THREE.TorusGeometry(.15,.035,10,24), gold);
+    key.position.set(0,1.55,.05);
+    key.visible = false;
+    drawer.add(key);
+
+    const door = new THREE.Group();
+    const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(1.8,3.4,.18), darkWood);
+    doorMesh.position.y = 1.7;
+    door.add(doorMesh);
+    const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(2.3,3.9,.25), metal);
+    doorFrame.position.set(0,1.95,.08);
+    door.add(doorFrame);
+    const doorSign = new THREE.Mesh(new THREE.BoxGeometry(.7,.25,.04), gold);
+    doorSign.position.set(0,2.65,-.13);
+    door.add(doorSign);
+    const doorHandle = new THREE.Mesh(new THREE.SphereGeometry(.09,12,8), gold);
+    doorHandle.position.set(.55,1.65,-.16);
+    door.add(doorHandle);
+    door.position.set(3.7,0,-5.75);
+    scene.add(door);
+
+    const objects = { map:mapGroup, drawer, chest, door };
+    const gameState = { step:1, hasKey:false, chestOpen:false, code:'7392', enteredCode:'' };
+    const rayDirection = new THREE.Vector3();
+
+    const zee = new THREE.Vector3(0,0,1);
+    const euler = new THREE.Euler();
+    const deviceQuaternion = new THREE.Quaternion();
+    const screenQuaternion = new THREE.Quaternion();
+    const cameraQuaternionTarget = new THREE.Quaternion();
+    const cameraQuaternionCurrent = new THREE.Quaternion();
+    const referenceQuaternion = new THREE.Quaternion();
+    const inverseReferenceQuaternion = new THREE.Quaternion();
+    const deviceCorrectionQuaternion = new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));
+
+    let referenceReady = false;
+    let orientationListening = false;
+    let dragging = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let actionCooldown = false;
+
+    const status = document.querySelector('#sensor-status');
+    const button = document.querySelector('#sensor-button');
+    const recenterButton = document.querySelector('#recenter-button');
+    const actionButton = document.querySelector('#action-button');
+    const exitButton = document.querySelector('#exit-button');
+    const success = document.querySelector('#success');
+    const prompt = document.querySelector('#prompt');
+    const keypad = document.querySelector('#keypad');
+    const codeDisplay = document.querySelector('#code-display');
+
+    function setStatus(text) { status.textContent = text; }
+    function getScreenAngle() {
+      if (screen.orientation && typeof screen.orientation.angle === 'number') return THREE.MathUtils.degToRad(screen.orientation.angle);
+      if (typeof window.orientation === 'number') return THREE.MathUtils.degToRad(window.orientation);
+      return 0;
+    }
+    function buildDeviceQuaternion(alpha,beta,gamma) {
+      euler.set(THREE.MathUtils.degToRad(beta),THREE.MathUtils.degToRad(alpha),THREE.MathUtils.degToRad(-gamma),'YXZ');
+      deviceQuaternion.setFromEuler(euler).multiply(deviceCorrectionQuaternion);
+      screenQuaternion.setFromAxisAngle(zee,-getScreenAngle());
+      deviceQuaternion.multiply(screenQuaternion);
+    }
+    function updateOrientation(alpha,beta,gamma) {
+      if (typeof alpha !== 'number' || typeof beta !== 'number' || typeof gamma !== 'number') return;
+      buildDeviceQuaternion(alpha,beta,gamma);
+      if (!referenceReady) {
+        referenceQuaternion.copy(deviceQuaternion);
+        inverseReferenceQuaternion.copy(referenceQuaternion).invert();
+        referenceReady = true;
+        setStatus('Sensores activos. Mira los objetos para interactuar.');
+      }
+      cameraQuaternionTarget.copy(inverseReferenceQuaternion).multiply(deviceQuaternion);
+    }
+    function onDeviceOrientation(event) { updateOrientation(event.alpha,event.beta,event.gamma); }
+    function attachBrowserOrientation() {
+      if (orientationListening) return;
+      addEventListener('deviceorientation',onDeviceOrientation,true);
+      orientationListening = true;
+    }
+    function startTelegramSensors() {
+      let started = false;
+      const sensor = telegram?.DeviceOrientation;
+      if (typeof sensor?.start === 'function') {
+        try { sensor.start({refresh_rate:30},error => error && console.warn(error)); started = true; } catch (error) { console.warn(error); }
+      }
+      if (typeof sensor?.onEvent === 'function') sensor.onEvent(data => updateOrientation(data?.alpha,data?.beta,data?.gamma));
+      return started;
+    }
+    function resetOrientationReference() {
+      referenceReady = false;
+      cameraQuaternionTarget.identity();
+      cameraQuaternionCurrent.identity();
+      camera.quaternion.identity();
+      setStatus('Vista centrada. Mueve el teléfono suavemente.');
+    }
+    async function enableSensors() {
+      button.disabled = true;
+      button.textContent = 'Solicitando permiso...';
+      setStatus('Solicitando acceso a los sensores...');
+      try {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission !== 'granted') throw new Error('Permiso de sensores rechazado');
+        }
+        attachBrowserOrientation();
+        startTelegramSensors();
+        resetOrientationReference();
+        button.textContent = 'Sensores activos';
+        recenterButton.hidden = false;
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message || 'No se pudieron activar los sensores');
+        button.disabled = false;
+        button.textContent = 'Reintentar sensores';
+      }
+    }
+    function focusObject(object) {
+      const fromCamera = new THREE.Vector3();
+      object.getWorldPosition(fromCamera);
+      const toObject = fromCamera.sub(camera.position).normalize();
+      const forward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize();
+      return forward.dot(toObject) > .94;
+    }
+    function updateAction() {
+      actionButton.hidden = true;
+      keypad.classList.remove('visible');
+      if (gameState.step === 1 && focusObject(objects.map)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Leer mapa';
+      } else if (gameState.step === 2 && focusObject(objects.drawer)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Abrir cajón';
+      } else if (gameState.step === 3 && focusObject(objects.chest)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Abrir cofre';
+      } else if (gameState.step === 4 && focusObject(objects.door)) {
+        actionButton.hidden = false;
+        actionButton.textContent = 'Introducir código';
+      }
+      if (gameState.step === 4 && focusObject(objects.door)) keypad.classList.add('visible');
+    }
+    function showActionMessage(text) { prompt.textContent = text; }
+    function performAction() {
+      if (actionCooldown) return;
+      actionCooldown = true;
+      setTimeout(() => actionCooldown = false, 350);
+      if (gameState.step === 1 && focusObject(objects.map)) {
+        gameState.step = 2;
+        showActionMessage('El mapa muestra una marca junto a la mesa. Busca la llave en el cajón.');
+      } else if (gameState.step === 2 && focusObject(objects.drawer)) {
+        gameState.hasKey = true;
+        gameState.step = 3;
+        key.visible = true;
+        showActionMessage('Has encontrado la llave. Ahora busca el cofre del tesoro.');
+      } else if (gameState.step === 3 && focusObject(objects.chest) && gameState.hasKey) {
+        gameState.chestOpen = true;
+        gameState.step = 4;
+        lidPivot.rotation.x = -Math.PI * .55;
+        showActionMessage(`El cofre se abre. El código grabado es ${gameState.code}. Enfoca la puerta.`);
+      } else if (gameState.step === 4 && focusObject(objects.door)) {
+        showActionMessage('Introduce el código de cuatro dígitos en el teclado.');
+      }
+      updateAction();
+    }
+    function updateCodeDisplay() { codeDisplay.textContent = gameState.enteredCode.padEnd(4,'_'); }
+    function submitCode() {
+      if (gameState.enteredCode.length !== 4) { showActionMessage('El código debe tener cuatro dígitos.'); return; }
+      if (gameState.enteredCode === gameState.code) {
+        gameState.step = 5;
+        doorMesh.material = new THREE.MeshStandardMaterial({ color:0x6e9b65, roughness:.65 });
+        success.classList.add('visible');
+        showActionMessage('¡Código correcto! La puerta está desbloqueada. ¡Has completado la Misión Pirata!');
+        exitButton.hidden = false;
+        keypad.classList.remove('visible');
+        actionButton.hidden = true;
+      } else {
+        gameState.enteredCode = '';
+        updateCodeDisplay();
+        showActionMessage('Código incorrecto. Revisa la pista del cofre e inténtalo otra vez.');
+      }
+    }
+    function checkExit() {
+      updateAction();
+    }
+
+    button.addEventListener('click',enableSensors);
+    recenterButton.addEventListener('click',resetOrientationReference);
+    actionButton.addEventListener('click',performAction);
+    exitButton.addEventListener('click',() => telegram?.close());
+    document.querySelectorAll('[data-digit]').forEach(buttonElement => buttonElement.addEventListener('click',() => {
+      if (gameState.enteredCode.length < 4) gameState.enteredCode += buttonElement.dataset.digit;
+      updateCodeDisplay();
+    }));
+    document.querySelector('#clear-code').addEventListener('click',() => { gameState.enteredCode = ''; updateCodeDisplay(); });
+    document.querySelector('#submit-code').addEventListener('click',submitCode);
+
+    if (screen.orientation) screen.orientation.addEventListener('change',() => { if (referenceReady) referenceReady = false; });
+    else addEventListener('orientationchange',() => { if (referenceReady) referenceReady = false; });
+    addEventListener('resize',() => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+    renderer.domElement.addEventListener('pointerdown',event => { dragging = true; lastPointerX = event.clientX; lastPointerY = event.clientY; renderer.domElement.setPointerCapture?.(event.pointerId); });
+    renderer.domElement.addEventListener('pointermove',event => {
+      if (!dragging) return;
+      const dx = event.clientX - lastPointerX;
+      const dy = event.clientY - lastPointerY;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-dy*.006,-dx*.006,0,'YXZ'));
+      cameraQuaternionTarget.multiply(q);
+    });
+    renderer.domElement.addEventListener('pointerup',event => { dragging = false; renderer.domElement.releasePointerCapture?.(event.pointerId); });
+    renderer.domElement.addEventListener('pointercancel',() => dragging = false);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      cameraQuaternionCurrent.slerp(cameraQuaternionTarget,.16);
+      camera.quaternion.copy(cameraQuaternionCurrent);
+      torch.intensity = 20 + Math.sin(performance.now()*.004)*3;
+      key.rotation.y += .015;
+      checkExit();
+      renderer.render(scene,camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
