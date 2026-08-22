@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nivel 1: El Cuarto de Prueba / Tutorial | Osorno Battle</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { color-scheme: dark; --ink:#0b0f11; --muted:#5a6b70; --accent:#4cd1c7; --line:rgba(76,209,199,.16); }
+    * { box-sizing: border-box; }
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#f6f8fa;color:var(--ink);font:15px/1.4 Arial,Helvetica,sans-serif}
+    #scene{position:fixed;inset:0;z-index:0}
+    canvas{display:block;width:100%;height:100%}
+    .hud{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:space-between;padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom))}
+    .topbar,.bottom{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+    .title{margin:0;font-size:clamp(18px,3vw,28px);font-weight:700;color:#071014}
+    .eyebrow{margin:0 0 4px;color:var(--accent);font:11px/1.2 Arial,sans-serif;letter-spacing:2px;text-transform:uppercase}
+    .status{max-width:340px;padding:10px 12px;border:1px solid var(--line);background:rgba(12,16,18,.04);color:var(--muted);font:12px/1.3 Arial,sans-serif}
+    .panel{max-width:440px;padding:14px 16px;border-left:2px solid var(--accent);background:rgba(255,255,255,.95);box-shadow:0 8px 30px rgba(0,0,0,.06)}
+    .panel p{margin:0 0 10px}
+    .help{color:var(--muted);font:12px/1.35 Arial,sans-serif}
+    .button{border:1px solid var(--accent);padding:10px 12px;background:var(--accent);color:#042425;cursor:pointer;font:700 12px Arial,sans-serif}
+    .button.secondary{border-color:var(--line);background:rgba(255,255,255,.9);color:var(--ink)}
+    .success{display:none;color:#0a7f73}
+    .success.visible{display:block}
+    .keypad{display:none;margin-top:12px}
+    .keypad.visible{display:block}
+    .code-display{min-height:36px;margin-bottom:8px;padding:8px;border:1px solid var(--line);background:rgba(0,0,0,0.02);color:var(--accent);font:700 20px/1.1 monospace;letter-spacing:6px}
+    .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+    .key-button{min-height:38px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;font:700 16px Arial,sans-serif}
+    @media (max-width:560px){.topbar,.bottom{align-items:stretch;flex-direction:column}.panel{max-width:none}}
+  </style>
+</head>
+<body>
+  <main id="scene" aria-label="Sala de prueba 3D (tutorial)"></main>
+  <section class="hud">
+    <div class="topbar">
+      <div><p class="eyebrow">Osorno Battle / Nivel 1</p><h1 class="title">El Cuarto de Prueba — Tutorial</h1></div>
+      <div id="sensor-status" class="status" role="status" aria-live="polite">Sensores en espera</div>
+    </div>
+    <div class="bottom">
+      <div class="panel">
+        <p id="prompt">Bienvenido al tutorial. Inspecciona la caja de entrenamiento sobre la mesa.</p>
+        <p class="help">Mueve el teléfono o arrastra con el dedo/mouse para mirar. Enfoca objetos para interactuar.</p>
+        <p id="success" class="success">¡Correcto! Código validado. Nivel completado.</p>
+        <button id="sensor-button" class="button" type="button">Activar sensores</button>
+        <button id="recenter-button" class="button secondary" type="button" hidden>Centrar vista</button>
+        <button id="action-button" class="button" type="button" hidden>Inspeccionar</button>
+        <div id="keypad" class="keypad" aria-label="Teclado de código">
+          <div id="code-display" class="code-display">____</div>
+          <div class="keys">
+            <button class="key-button" data-digit="1">1</button><button class="key-button" data-digit="2">2</button><button class="key-button" data-digit="3">3</button>
+            <button class="key-button" data-digit="4">4</button><button class="key-button" data-digit="5">5</button><button class="key-button" data-digit="6">6</button>
+            <button class="key-button" data-digit="7">7</button><button class="key-button" data-digit="8">8</button><button class="key-button" data-digit="9">9</button>
+            <button class="key-button" data-digit="0">0</button><button id="clear-code" class="key-button">Borrar</button><button id="submit-code" class="key-button">OK</button>
+          </div>
+        </div>
+        <button id="exit-button" class="button secondary" type="button" hidden>Cerrar</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+
+    const telegram = window.Telegram?.WebApp ?? null;
+    telegram?.ready();
+    telegram?.expand();
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf6f8fa);
+
+    const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.1, 40);
+    camera.position.set(0, 1.6, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.querySelector('#scene').appendChild(renderer.domElement);
+
+    const ambient = new THREE.HemisphereLight(0xffffff, 0x888888, 1.0);
+    scene.add(ambient);
+    const led = new THREE.PointLight(0x4cd1c7, 6, 8, 2);
+    led.position.set(0, 3.2, -1);
+    scene.add(led);
+
+    // Floor and simple walls (minimalist test room)
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .95 }));
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: .98 });
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(12, 5, .2), wallMat);
+    backWall.position.set(0, 2.5, -6);
+    scene.add(backWall);
+
+    // Table and training box
+    const table = new THREE.Group();
+    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2.4, .12, 1.1), new THREE.MeshStandardMaterial({ color: 0xededf0, roughness: .92 }));
+    tableTop.position.y = 1.1;
+    table.add(tableTop);
+    table.position.set(-1.8, 0, -2.6);
+    scene.add(table);
+
+    const box = new THREE.Mesh(new THREE.BoxGeometry(.6, .4, .6), new THREE.MeshStandardMaterial({ color: 0xdfe8ea, metalness: .3, roughness: .4 }));
+    box.position.set(-1.8, 1.3, -2.6);
+    scene.add(box);
+
+    // Calibration panel on wall
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(1.4, .9, .05), new THREE.MeshStandardMaterial({ color: 0xe9eef0 }));
+    panel.position.set(1.6, 3.2, -5.78);
+    scene.add(panel);
+
+    // Door
+    const door = new THREE.Group();
+    const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 3, .08), new THREE.MeshStandardMaterial({ color: 0xeceff0 }));
+    doorMesh.position.y = 1.5;
+    door.add(doorMesh);
+    door.position.set(3.2, 0, -5.75);
+    scene.add(door);
+
+    const objects = { box, panel, door };
+    const gameState = { step: 1, enteredCode: '', code: '1234' };
+
+    const zee = new THREE.Vector3(0, 0, 1);
+    const euler = new THREE.Euler();
+    const deviceQuaternion = new THREE.Quaternion();
+    const screenQuaternion = new THREE.Quaternion();
+    const cameraQuaternionTarget = new THREE.Quaternion();
+    const cameraQuaternionCurrent = new THREE.Quaternion();
+    const referenceQuaternion = new THREE.Quaternion();
+    const inverseReferenceQuaternion = new THREE.Quaternion();
+    const deviceCorrectionQuaternion = new THREE.Quaternion(-Math.sqrt(.5), 0, 0, Math.sqrt(.5));
+
+    let referenceReady = false;
+    let orientationListening = false;
+    let dragging = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let actionCooldown = false;
+
+    const status = document.querySelector('#sensor-status');
+    const sensorBtn = document.querySelector('#sensor-button');
+    const recenterBtn = document.querySelector('#recenter-button');
+    const actionButton = document.querySelector('#action-button');
+    const exitButton = document.querySelector('#exit-button');
+    const success = document.querySelector('#success');
+    const prompt = document.querySelector('#prompt');
+    const keypad = document.querySelector('#keypad');
+    const codeDisplay = document.querySelector('#code-display');
+
+    function setStatus(t) { status.textContent = t; }
+    function getScreenAngle() {
+      if (screen.orientation && typeof screen.orientation.angle === 'number') return THREE.MathUtils.degToRad(screen.orientation.angle);
+      if (typeof window.orientation === 'number') return THREE.MathUtils.degToRad(window.orientation);
+      return 0;
+    }
+    function buildDeviceQuaternion(alpha, beta, gamma) {
+      euler.set(THREE.MathUtils.degToRad(beta), THREE.MathUtils.degToRad(alpha), THREE.MathUtils.degToRad(-gamma), 'YXZ');
+      deviceQuaternion.setFromEuler(euler).multiply(deviceCorrectionQuaternion);
+      screenQuaternion.setFromAxisAngle(zee, -getScreenAngle());
+      deviceQuaternion.multiply(screenQuaternion);
+    }
+    function updateOrientation(alpha, beta, gamma) {
+      if (typeof alpha !== 'number' || typeof beta !== 'number' || typeof gamma !== 'number') return;
+      buildDeviceQuaternion(alpha, beta, gamma);
+      if (!referenceReady) {
+        referenceQuaternion.copy(deviceQuaternion);
+        inverseReferenceQuaternion.copy(referenceQuaternion).invert();
+        referenceReady = true;
+        setStatus('Sensores activos. Mira los objetos para interactuar.');
+      }
+      cameraQuaternionTarget.copy(inverseReferenceQuaternion).multiply(deviceQuaternion);
+    }
+    function onDeviceOrientation(event) { updateOrientation(event.alpha, event.beta, event.gamma); }
+    function attachBrowserOrientation() { if (orientationListening) return; addEventListener('deviceorientation', onDeviceOrientation, true); orientationListening = true; }
+    function startTelegramSensors() {
+      let started = false; const sensor = telegram?.DeviceOrientation; if (typeof sensor?.start === 'function') { try { sensor.start({ refresh_rate: 30 }, error => error && console.warn(error)); started = true; } catch (e) { console.warn(e); } }
+      if (typeof sensor?.onEvent === 'function') sensor.onEvent(data => updateOrientation(data?.alpha, data?.beta, data?.gamma)); return started;
+    }
+    function resetOrientationReference() { referenceReady = false; cameraQuaternionTarget.identity(); cameraQuaternionCurrent.identity(); camera.quaternion.identity(); setStatus('Vista centrada. Mueve el teléfono suavemente.'); }
+    async function enableSensors() { sensorBtn.disabled = true; sensorBtn.textContent = 'Solicitando permiso...'; setStatus('Solicitando acceso a los sensores...'); try { if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') { const permission = await DeviceOrientationEvent.requestPermission(); if (permission !== 'granted') throw new Error('Permiso de sensores rechazado'); } attachBrowserOrientation(); startTelegramSensors(); resetOrientationReference(); sensorBtn.textContent = 'Sensores activos'; recenterBtn.hidden = false; } catch (error) { console.error(error); setStatus(error.message || 'No se pudieron activar los sensores'); sensorBtn.disabled = false; sensorBtn.textContent = 'Reintentar sensores'; } }
+
+    function focusObject(object, maxDistance = 9) {
+      const origin = new THREE.Vector3(); const dir = new THREE.Vector3(); scene.updateMatrixWorld(true); camera.getWorldPosition(origin); camera.getWorldDirection(dir); const ray = new THREE.Raycaster(origin, dir); const meshes = []; object.traverse(c => { if (c.isMesh && c.visible) meshes.push(c); }); if (!meshes.length) return false; const intersects = ray.intersectObjects(meshes, false); return intersects.length > 0 && intersects[0].distance <= maxDistance;
+    }
+
+    function updateAction() {
+      actionButton.hidden = true; keypad.classList.remove('visible');
+      if (gameState.step === 1 && focusObject(objects.box)) { actionButton.hidden = false; actionButton.textContent = 'Inspeccionar caja'; }
+      else if (gameState.step === 2 && focusObject(objects.panel)) { actionButton.hidden = false; actionButton.textContent = 'Revisar panel'; }
+      else if (gameState.step === 3 && focusObject(objects.door)) { actionButton.hidden = false; actionButton.textContent = 'Introducir código'; keypad.classList.add('visible'); }
+    }
+
+    function performAction() {
+      if (actionCooldown) return; actionCooldown = true; setTimeout(() => actionCooldown = false, 300);
+      if (gameState.step === 1 && focusObject(objects.box)) {
+        gameState.step = 2; prompt.textContent = 'La caja muestra una etiqueta: Código de prueba: 12. Ahora mira el panel de calibración.';
+      } else if (gameState.step === 2 && focusObject(objects.panel)) {
+        gameState.step = 3; prompt.textContent = 'El panel muestra una secuencia: 1234. Enfoca la puerta e introduce el código.';
+      } else if (gameState.step === 3 && focusObject(objects.door)) {
+        prompt.textContent = 'Introduce el código de cuatro dígitos en el teclado.';
+      }
+      updateAction();
+    }
+
+    function updateCodeDisplay() { codeDisplay.textContent = gameState.enteredCode.padEnd(4, '_'); }
+    function submitCode() {
+      if (gameState.enteredCode.length !== 4) { prompt.textContent = 'El código debe tener cuatro dígitos.'; return; }
+      if (gameState.enteredCode === gameState.code) {
+        success.classList.add('visible'); prompt.textContent = 'Código correcto. Nivel completado.'; exitButton.hidden = false; keypad.classList.remove('visible'); actionButton.hidden = true; gameState.step = 4;
+        // guardar progreso y avanzar
+        levelComplete(1);
+      } else { gameState.enteredCode = ''; updateCodeDisplay(); prompt.textContent = 'Código incorrecto. Intenta nuevamente.'; }
+    }
+
+    sensorBtn.addEventListener('click', enableSensors);
+    recenterBtn.addEventListener('click', resetOrientationReference);
+    actionButton.addEventListener('click', performAction);
+    exitButton.addEventListener('click', () => levelComplete(1));
+    document.querySelectorAll('[data-digit]').forEach(el => el.addEventListener('click', () => { if (gameState.enteredCode.length < 4) gameState.enteredCode += el.dataset.digit; updateCodeDisplay(); }));
+    document.querySelector('#clear-code').addEventListener('click', () => { gameState.enteredCode = ''; updateCodeDisplay(); });
+    document.querySelector('#submit-code').addEventListener('click', submitCode);
+
+    if (screen.orientation) screen.orientation.addEventListener('change', () => { if (referenceReady) referenceReady = false; }); else addEventListener('orientationchange', () => { if (referenceReady) referenceReady = false; });
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    renderer.domElement.addEventListener('pointerdown', event => { dragging = true; lastPointerX = event.clientX; lastPointerY = event.clientY; renderer.domElement.setPointerCapture?.(event.pointerId); });
+    renderer.domElement.addEventListener('pointermove', event => { if (!dragging) return; const dx = event.clientX - lastPointerX; const dy = event.clientY - lastPointerY; lastPointerX = event.clientX; lastPointerY = event.clientY; const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-dy * .006, -dx * .006, 0, 'YXZ')); cameraQuaternionTarget.multiply(q); });
+    renderer.domElement.addEventListener('pointerup', event => { dragging = false; renderer.domElement.releasePointerCapture?.(event.pointerId); });
+    renderer.domElement.addEventListener('pointercancel', () => dragging = false);
+
+    function checkFocusForDoor() { updateAction(); }
+
+    function animate() { requestAnimationFrame(animate); cameraQuaternionCurrent.slerp(cameraQuaternionTarget, .16); camera.quaternion.copy(cameraQuaternionCurrent); renderer.render(scene, camera); }
+    animate();
+
+    // --- progresión de niveles: guardar y avanzar desde Nivel 1 ---
+    function levelComplete(currentLevel) {
+      try {
+        const key = 'escaperoom_unlocked';
+        const stored = parseInt(localStorage.getItem(key) || '1', 10);
+        const next = Math.min(4, currentLevel + 1);
+        if (stored < next) localStorage.setItem(key, String(next));
+        setTimeout(() => {
+          if (next <= 4) {
+            const nextHref = (next === 1) ? 'lvl1.html' : `lvl${next}.html`;
+            location.href = nextHref;
+          } else {
+            localStorage.setItem(key, '4');
+            location.href = 'index.html?completed=1';
+          }
+        }, 600);
+      } catch (e) {
+        console.warn('No se pudo guardar progreso:', e);
+        telegram?.close();
+      }
+    }
+
+    // auto-advance if success shown (safety)
+    if (success) {
+      const mo = new MutationObserver((mutations, obs) => { if (success.classList.contains('visible')) { obs.disconnect(); setTimeout(() => levelComplete(1), 700); } });
+      mo.observe(success, { attributes: true, attributeFilter: ['class'] });
+    }
+
+  </script>
+</body>
+</html>
