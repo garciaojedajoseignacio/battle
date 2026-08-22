@@ -28,6 +28,7 @@
     .code-display{min-height:36px;margin-bottom:8px;padding:8px;border:1px solid var(--line);background:rgba(0,0,0,0.02);color:var(--accent);font:700 20px/1.1 monospace;letter-spacing:6px}
     .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
     .key-button{min-height:38px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;font:700 16px Arial,sans-serif}
+    .error-note{margin-top:8px;color:#b33}
     @media (max-width:560px){.topbar,.bottom{align-items:stretch;flex-direction:column}.panel{max-width:none}}
   </style>
 </head>
@@ -43,6 +44,7 @@
         <p id="prompt">Bienvenido al tutorial. Inspecciona la caja de entrenamiento sobre la mesa.</p>
         <p class="help">Mueve el teléfono o arrastra con el dedo/mouse para mirar. Enfoca objetos para interactuar.</p>
         <p id="success" class="success">¡Correcto! Código validado. Nivel completado.</p>
+        <div id="error-block" class="error-note" hidden></div>
         <button id="sensor-button" class="button" type="button">Activar sensores</button>
         <button id="recenter-button" class="button secondary" type="button" hidden>Centrar vista</button>
         <button id="action-button" class="button" type="button" hidden>Inspeccionar</button>
@@ -61,11 +63,42 @@
   </section>
 
   <script type="module">
+    // --- Defensive startup / anti-loop guard ---
+    (function(){
+      console.debug('[lvl1] startup trace', { href: location.href, pathname: location.pathname, search: location.search });
+      try {
+        // navigation counter (session-scoped)
+        const NAV_KEY = 'escaperoom_nav_count';
+        const MAX_NAV = 3;
+        let count = parseInt(sessionStorage.getItem(NAV_KEY) || '0', 10);
+        count = isNaN(count) ? 0 : count;
+        count += 1;
+        sessionStorage.setItem(NAV_KEY, String(count));
+        if (count > MAX_NAV) {
+          // Block further automatic redirects and surface an error to the player
+          window.__escaperoom_redirect_blocked = true;
+          console.warn('[lvl1] navigation blocked to avoid loop, count=', count);
+          const errEl = document.getElementById('error-block');
+          if (errEl) {
+            errEl.hidden = false;
+            errEl.textContent = 'Se detectó actividad de navegación repetida. Por favor, abre el menú manualmente o recarga la aplicación si sigue ocurriendo.';
+          }
+        } else {
+          window.__escaperoom_redirect_blocked = false;
+        }
+        // consume arriving flag (set by menu) for traceability
+        const navFlag = sessionStorage.getItem('escaperoom_navigating_to');
+        if (navFlag) { console.debug('[lvl1] arrived with navFlag=', navFlag); sessionStorage.removeItem('escaperoom_navigating_to'); }
+      } catch (e) {
+        console.warn('[lvl1] sessionStorage access error', e);
+        window.__escaperoom_redirect_blocked = false;
+      }
+    })();
+
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
 
     const telegram = window.Telegram?.WebApp ?? null;
-    telegram?.ready();
-    telegram?.expand();
+    try { telegram?.ready(); telegram?.expand(); } catch(e){ console.warn('[lvl1] telegram init error', e); }
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf6f8fa);
@@ -149,6 +182,7 @@
     const prompt = document.querySelector('#prompt');
     const keypad = document.querySelector('#keypad');
     const codeDisplay = document.querySelector('#code-display');
+    const errorBlock = document.getElementById('error-block');
 
     function setStatus(t) { status.textContent = t; }
     function getScreenAngle() {
@@ -238,18 +272,26 @@
 
     // --- progresión de niveles: guardar y avanzar desde Nivel 1 ---
     function levelComplete(currentLevel) {
+      console.debug('[lvl1] levelComplete called, currentLevel=', currentLevel, 'redirectBlocked=', window.__escaperoom_redirect_blocked);
       try {
         const key = 'escaperoom_unlocked';
         const stored = parseInt(localStorage.getItem(key) || '1', 10);
         const next = Math.min(4, currentLevel + 1);
         if (stored < next) localStorage.setItem(key, String(next));
         setTimeout(() => {
+          if (window.__escaperoom_redirect_blocked) {
+            console.warn('[lvl1] redirect suppressed due to redirect block');
+            if (errorBlock) { errorBlock.hidden = false; errorBlock.textContent = 'Redirección suprimida para evitar bucle. Abre el menú manualmente.'; }
+            return;
+          }
           if (next <= 4) {
             const nextHref = (next === 1) ? 'lvl1.html' : `lvl${next}.html`;
-            location.href = nextHref;
+            console.debug('[lvl1] navigating to', nextHref);
+            // use assign to be explicit
+            location.assign(nextHref);
           } else {
             localStorage.setItem(key, '4');
-            location.href = 'index.html?completed=1';
+            location.assign('index.html?completed=1');
           }
         }, 600);
       } catch (e) {
