@@ -25,16 +25,7 @@
     .button:focus-visible { outline: 2px solid white; outline-offset: 3px; }
     .success { display: none; color: #b9e8c8; }
     .success.visible { display: block; }
-
-    /* Menu / Orquestador */
-    #menu-overlay { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(0,0,0,.6), rgba(0,0,0,.8)); }
-    #menu { width: min(620px, 92%); background: rgba(18,24,22,.96); border: 1px solid var(--line); padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,.6); color: var(--ink); }
-    #menu h2 { margin: 0 0 12px; font-size: 20px; }
-    .levels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
-    .level-btn { padding: 10px 12px; border: 1px solid var(--line); background: rgba(16,24,23,.75); color: var(--ink); cursor: pointer; text-align: left; }
-    .level-btn.locked { opacity: .45; cursor: not-allowed; }
-    .menu-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    @media (max-width: 560px) { .topbar, .bottom { align-items: stretch; flex-direction: column; } .status { align-self: flex-start; } .panel { max-width: none; } .levels { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) { .topbar, .bottom { align-items: stretch; flex-direction: column; } .status { align-self: flex-start; } .panel { max-width: none; } }
   </style>
 </head>
 <body>
@@ -386,7 +377,7 @@
         // Small delay so user sees success
         setTimeout(() => {
           if (next <= 4) {
-            const nextHref = (next === 1) ? 'index.html' : `lvl${next}.html`;
+            const nextHref = (next === 1) ? 'lvl1.html' : `lvl${next}.html`;
             location.href = nextHref;
           } else {
             localStorage.setItem(key, '4');
@@ -445,11 +436,9 @@
         const lvl = parseInt(btn.dataset.level, 10);
         const unlocked = getUnlocked();
         if (lvl <= unlocked) {
-          if (lvl === 1) {
-            location.href = 'index.html';
-          } else {
-            location.href = `lvl${lvl}.html`;
-          }
+          const target = (lvl === 1) ? 'lvl1.html' : `lvl${lvl}.html`;
+          console.debug('[menu] navigating to', target, 'from', location.pathname);
+          location.href = target;
         } else {
           // locked: optional feedback
           btn.blur();
@@ -458,13 +447,15 @@
 
       continueBtn.addEventListener('click', () => {
         const unlocked = getUnlocked();
-        const target = (unlocked === 1) ? 'index.html' : `lvl${unlocked}.html`;
+        const target = (unlocked === 1) ? 'lvl1.html' : `lvl${unlocked}.html`;
+        console.debug('[menu] continue ->', target, 'localStorage', localStorage.getItem(unlockedKey));
         location.href = target;
       });
 
       closeMenuBtn.addEventListener('click', () => {
         const unlocked = getUnlocked();
-        const target = (unlocked === 1) ? 'index.html' : `lvl${unlocked}.html`;
+        const target = (unlocked === 1) ? 'lvl1.html' : `lvl${unlocked}.html`;
+        console.debug('[menu] play selected ->', target, 'localStorage', localStorage.getItem(unlockedKey));
         location.href = target;
       });
 
