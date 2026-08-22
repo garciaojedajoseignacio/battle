@@ -11,7 +11,7 @@
     html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#17100b; color:var(--ink); font:15px/1.4 Georgia,'Times New Roman',serif; }
     #scene { position:fixed; inset:0; z-index:0; }
     canvas { display:block; width:100%; height:100%; }
-    .hud { position:fixed; inset:0; z-index:2; display:flex; flex-direction:column; justify-content:space-between; padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom)); pointer-events:none; }
+    .hud { position:fixed; inset:0; z-index:2; display:flex; flex-direction:column; justify-content:space-between; padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom)); }
     .topbar,.bottom { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
     .title { margin:0; font-size:clamp(22px,4vw,38px); font-weight:400; text-shadow:0 2px 18px #000; }
     .eyebrow { margin:0 0 4px; color:var(--accent); font:11px/1.2 Arial,sans-serif; letter-spacing:2px; text-transform:uppercase; }
@@ -19,7 +19,7 @@
     .panel { max-width:440px; padding:16px 18px; border-left:2px solid var(--accent); background:rgba(28,17,9,.86); box-shadow:0 8px 30px rgba(0,0,0,.35); pointer-events:auto; }
     .panel p { margin:0 0 12px; }
     .help { color:var(--muted); font:12px/1.35 Arial,sans-serif; }
-    .button { border:1px solid var(--accent); padding:10px 14px; background:var(--accent); color:#24170a; cursor:pointer; font:700 12px Arial,sans-serif; letter-spacing:.7px; text-transform:uppercase; pointer-events:auto; touch-action:manipulation; }
+    .button { border:1px solid var(--accent); padding:10px 14px; background:var(--accent); color:#24170a; cursor:pointer; font:700 12px Arial,sans-serif; letter-spacing:.7px; text-transform:uppercase; }
     .button.secondary { border-color:var(--line); background:rgba(28,17,9,.8); color:var(--ink); }
     .button:disabled { cursor:wait; opacity:.65; }
     .button:focus-visible { outline:2px solid white; outline-offset:3px; }
@@ -27,7 +27,7 @@
     .success.visible { display:block; }
     .keypad { display:none; margin-top:12px; }
     .keypad.visible { display:block; }
-    .code-display { min-height:36px; margin-bottom:8px; padding:8px; border:1px solid var(--line); background:rgba(0,0,0,.28); color:var(--accent); font:700 20px/1.1 monospace; letter-spacing:6px; text-align:center; }
+    .code-display { min-height:36px; margin-bottom:8px; padding:8px; border:1px solid var(--line); background:rgba(0,0,0,.28); color:var(--accent); font:700 20px/1.1 monospace; letter-spacing:6px; }
     .keys { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
     .key-button { min-height:38px; border:1px solid var(--line); background:#3b2514; color:var(--ink); cursor:pointer; font:700 16px Arial,sans-serif; }
     .key-button:hover { background:#5a371b; }
@@ -368,7 +368,9 @@
     button.addEventListener('click',enableSensors);
     recenterButton.addEventListener('click',resetOrientationReference);
     actionButton.addEventListener('click',performAction);
-    exitButton.addEventListener('click',() => telegram?.close());
+    // replaced exit behavior to allow progression
+    // exitButton.addEventListener('click',() => telegram?.close());
+
     document.querySelectorAll('[data-digit]').forEach(buttonElement => buttonElement.addEventListener('click',() => {
       if (gameState.enteredCode.length < 4) gameState.enteredCode += buttonElement.dataset.digit;
       updateCodeDisplay();
@@ -403,6 +405,43 @@
       renderer.render(scene,camera);
     }
     animate();
+
+    // --- progresión de niveles: guardar y avanzar desde Nivel 2 ---
+    function levelComplete(currentLevel) {
+      try {
+        const key = 'escaperoom_unlocked';
+        const stored = parseInt(localStorage.getItem(key) || '1', 10);
+        const next = Math.min(4, currentLevel + 1);
+        if (stored < next) localStorage.setItem(key, String(next));
+        setTimeout(() => {
+          if (next <= 4) {
+            const nextHref = (next === 1) ? 'index.html' : `lvl${next}.html`;
+            location.href = nextHref;
+          } else {
+            localStorage.setItem(key, '4');
+            location.href = 'index.html?completed=1';
+          }
+        }, 900);
+      } catch (e) {
+        console.warn('No se pudo guardar progreso:', e);
+        telegram?.close();
+      }
+    }
+
+    // attach progression to exit button
+    exitButton.addEventListener('click', () => levelComplete(2));
+
+    // auto-advance when success is shown
+    if (success) {
+      const mo = new MutationObserver((mutations, obs) => {
+        if (success.classList.contains('visible')) {
+          obs.disconnect();
+          setTimeout(() => levelComplete(2), 1000);
+        }
+      });
+      mo.observe(success, { attributes: true, attributeFilter: ['class'] });
+    }
+
   </script>
 </body>
 </html>
