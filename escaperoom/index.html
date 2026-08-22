@@ -415,7 +415,7 @@
     }
 
     // Menu / orchestrator logic
-    (function menuOrchestrator() {
+    document.addEventListener('DOMContentLoaded', () => {
       const overlay = document.getElementById('menu-overlay');
       const levelButtons = Array.from(document.querySelectorAll('.level-btn'));
       const continueBtn = document.getElementById('continue-btn');
@@ -438,40 +438,41 @@
             btn.disabled = true;
           }
         });
-        // show overlay by default when opening index (acts as menu/orquestador)
         overlay.hidden = false;
       }
 
       levelButtons.forEach(btn => btn.addEventListener('click', () => {
         const lvl = parseInt(btn.dataset.level, 10);
-        if (lvl === 1) {
-          overlay.hidden = true; // stay in this page (level 1)
+        const unlocked = getUnlocked();
+        if (lvl <= unlocked) {
+          if (lvl === 1) {
+            location.href = 'index.html';
+          } else {
+            location.href = `lvl${lvl}.html`;
+          }
         } else {
-          location.href = `lvl${lvl}.html`;
+          // locked: optional feedback
+          btn.blur();
         }
       }));
 
       continueBtn.addEventListener('click', () => {
         const unlocked = getUnlocked();
-        if (unlocked === 1) {
-          // hide and play level 1 in-place
-          overlay.hidden = true;
-        } else {
-          location.href = (unlocked === 1) ? 'index.html' : `lvl${unlocked}.html`;
-        }
+        const target = (unlocked === 1) ? 'index.html' : `lvl${unlocked}.html`;
+        location.href = target;
       });
 
       closeMenuBtn.addEventListener('click', () => {
-        // If user selected a level earlier, the click would have navigated; otherwise act as continue
         const unlocked = getUnlocked();
-        if (unlocked === 1) overlay.hidden = true; else location.href = `lvl${unlocked}.html`;
+        const target = (unlocked === 1) ? 'index.html' : `lvl${unlocked}.html`;
+        location.href = target;
       });
 
       // if page opened with ?play=1 hide menu
       if (location.search.includes('play=1')) overlay.hidden = true;
 
       render();
-    })();
+    });
 
     renderer.domElement.addEventListener('pointerdown', event => {
       /* rest of original code uses pointer events above; menu overlay sits on top */
