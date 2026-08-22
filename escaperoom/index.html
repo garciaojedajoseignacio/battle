@@ -11,7 +11,7 @@
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101817; color: var(--ink); font: 15px/1.4 Georgia, 'Times New Roman', serif; }
     #scene { position: fixed; inset: 0; z-index: 0; }
     canvas { display: block; width: 100%; height: 100%; }
-    .hud { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); pointer-events: none; }
+    .hud { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); }
     .topbar, .bottom { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     .title { margin: 0; font-size: clamp(22px, 4vw, 38px); font-weight: 400; text-shadow: 0 2px 18px #000; }
     .eyebrow { margin: 0 0 4px; color: var(--accent); font: 11px/1.2 Arial, sans-serif; letter-spacing: 2px; text-transform: uppercase; }
@@ -19,13 +19,22 @@
     .panel { max-width: 430px; padding: 16px 18px; border-left: 2px solid var(--accent); background: rgba(16,24,23,.76); box-shadow: 0 8px 30px rgba(0,0,0,.25); pointer-events: auto; }
     .panel p { margin: 0 0 12px; }
     .help { color: var(--muted); font: 12px/1.35 Arial, sans-serif; }
-    .button { border: 1px solid var(--accent); padding: 10px 14px; background: var(--accent); color: #17211e; cursor: pointer; font: 700 12px Arial, sans-serif; letter-spacing: .7px; text-transform: uppercase; pointer-events: auto; touch-action: manipulation; }
+    .button { border: 1px solid var(--accent); padding: 10px 14px; background: var(--accent); color: #17211e; cursor: pointer; font: 700 12px Arial, sans-serif; letter-spacing: .7px; text-transform: uppercase; }
     .button.secondary { border-color: var(--line); background: rgba(16,24,23,.75); color: var(--ink); }
     .button:disabled { cursor: wait; opacity: .7; }
     .button:focus-visible { outline: 2px solid white; outline-offset: 3px; }
     .success { display: none; color: #b9e8c8; }
     .success.visible { display: block; }
-    @media (max-width: 560px) { .topbar, .bottom { align-items: stretch; flex-direction: column; } .status { align-self: flex-start; } .panel { max-width: none; } }
+
+    /* Menu / Orquestador */
+    #menu-overlay { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(0,0,0,.6), rgba(0,0,0,.8)); }
+    #menu { width: min(620px, 92%); background: rgba(18,24,22,.96); border: 1px solid var(--line); padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,.6); color: var(--ink); }
+    #menu h2 { margin: 0 0 12px; font-size: 20px; }
+    .levels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+    .level-btn { padding: 10px 12px; border: 1px solid var(--line); background: rgba(16,24,23,.75); color: var(--ink); cursor: pointer; text-align: left; }
+    .level-btn.locked { opacity: .45; cursor: not-allowed; }
+    .menu-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    @media (max-width: 560px) { .topbar, .bottom { align-items: stretch; flex-direction: column; } .status { align-self: flex-start; } .panel { max-width: none; } .levels { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -46,6 +55,24 @@
       </div>
     </div>
   </section>
+
+  <!-- Menu overlay: Orquestador de niveles -->
+  <div id="menu-overlay" role="dialog" aria-modal="true" hidden>
+    <div id="menu">
+      <h2>Escape Room — Selecciona nivel</h2>
+      <p id="menu-note" style="margin:0 0 8px; color:var(--muted);">Selecciona un nivel desbloqueado o continúa donde lo dejaste.</p>
+      <div class="levels">
+        <button class="level-btn" data-level="1">Nivel 1 — Sala Oculta</button>
+        <button class="level-btn" data-level="2">Nivel 2 — Misión Pirata</button>
+        <button class="level-btn" data-level="3">Nivel 3 — Despacho del Detective</button>
+        <button class="level-btn" data-level="4">Nivel 4 — Estación Espacial</button>
+      </div>
+      <div class="menu-actions">
+        <button id="continue-btn" class="button secondary">Continuar</button>
+        <button id="close-menu" class="button">Jugar nivel seleccionado</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
@@ -304,7 +331,7 @@
 
     button.addEventListener('click', enableSensors);
     recenterButton.addEventListener('click', resetOrientationReference);
-    exitButton.addEventListener('click', () => telegram?.close());
+    // exitButton behavior replaced by progression handler below
 
     if (screen.orientation) {
       screen.orientation.addEventListener('change', handleScreenOrientationChange);
@@ -348,6 +375,106 @@
 
     renderer.domElement.addEventListener('pointercancel', () => {
       dragging = false;
+    });
+
+    function levelComplete(currentLevel) {
+      try {
+        const key = 'escaperoom_unlocked';
+        const stored = parseInt(localStorage.getItem(key) || '1', 10);
+        const next = Math.min(4, currentLevel + 1);
+        if (stored < next) localStorage.setItem(key, String(next));
+        // Small delay so user sees success
+        setTimeout(() => {
+          if (next <= 4) {
+            const nextHref = (next === 1) ? 'index.html' : `lvl${next}.html`;
+            location.href = nextHref;
+          } else {
+            localStorage.setItem(key, '4');
+            location.href = 'index.html?completed=1';
+          }
+        }, 900);
+      } catch (e) {
+        console.warn('No se pudo guardar progreso:', e);
+        // Fallback: just close telegram if available
+        telegram?.close();
+      }
+    }
+
+    // Replace exit behavior: clicking exit continues progression
+    exitButton.addEventListener('click', () => levelComplete(1));
+
+    // Observe success element and auto-progress when it becomes visible
+    if (success) {
+      const mo = new MutationObserver((mutations, obs) => {
+        if (success.classList.contains('visible')) {
+          obs.disconnect();
+          setTimeout(() => levelComplete(1), 1000);
+        }
+      });
+      mo.observe(success, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // Menu / orchestrator logic
+    (function menuOrchestrator() {
+      const overlay = document.getElementById('menu-overlay');
+      const levelButtons = Array.from(document.querySelectorAll('.level-btn'));
+      const continueBtn = document.getElementById('continue-btn');
+      const closeMenuBtn = document.getElementById('close-menu');
+      const unlockedKey = 'escaperoom_unlocked';
+
+      function getUnlocked() {
+        return Math.min(4, Math.max(1, parseInt(localStorage.getItem(unlockedKey) || '1', 10)));
+      }
+
+      function render() {
+        const unlocked = getUnlocked();
+        levelButtons.forEach(btn => {
+          const lvl = parseInt(btn.dataset.level, 10);
+          if (lvl <= unlocked) {
+            btn.classList.remove('locked');
+            btn.disabled = false;
+          } else {
+            btn.classList.add('locked');
+            btn.disabled = true;
+          }
+        });
+        // show overlay by default when opening index (acts as menu/orquestador)
+        overlay.hidden = false;
+      }
+
+      levelButtons.forEach(btn => btn.addEventListener('click', () => {
+        const lvl = parseInt(btn.dataset.level, 10);
+        if (lvl === 1) {
+          overlay.hidden = true; // stay in this page (level 1)
+        } else {
+          location.href = `lvl${lvl}.html`;
+        }
+      }));
+
+      continueBtn.addEventListener('click', () => {
+        const unlocked = getUnlocked();
+        if (unlocked === 1) {
+          // hide and play level 1 in-place
+          overlay.hidden = true;
+        } else {
+          location.href = (unlocked === 1) ? 'index.html' : `lvl${unlocked}.html`;
+        }
+      });
+
+      closeMenuBtn.addEventListener('click', () => {
+        // If user selected a level earlier, the click would have navigated; otherwise act as continue
+        const unlocked = getUnlocked();
+        if (unlocked === 1) overlay.hidden = true; else location.href = `lvl${unlocked}.html`;
+      });
+
+      // if page opened with ?play=1 hide menu
+      if (location.search.includes('play=1')) overlay.hidden = true;
+
+      render();
+    })();
+
+    renderer.domElement.addEventListener('pointerdown', event => {
+      /* rest of original code uses pointer events above; menu overlay sits on top */
     });
 
     function animate() {
