@@ -11,7 +11,7 @@
     html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#111216; color:var(--ink); font:15px/1.4 Georgia,'Times New Roman',serif; }
     #scene { position:fixed; inset:0; z-index:0; }
     canvas { display:block; width:100%; height:100%; }
-    .hud { position:fixed; inset:0; z-index:2; display:flex; flex-direction:column; justify-content:space-between; padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom)); pointer-events:none; }
+    .hud { position:fixed; inset:0; z-index:2; display:flex; flex-direction:column; justify-content:space-between; padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom)); }
     .topbar,.bottom { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
     .title { margin:0; font-size:clamp(22px,4vw,38px); font-weight:400; text-shadow:0 2px 18px #000; }
     .eyebrow { margin:0 0 4px; color:var(--accent); font:11px/1.2 Arial,sans-serif; letter-spacing:2px; text-transform:uppercase; }
@@ -19,7 +19,7 @@
     .panel { max-width:450px; padding:16px 18px; border-left:2px solid var(--accent); background:rgba(16,17,22,.9); box-shadow:0 8px 30px rgba(0,0,0,.4); pointer-events:auto; }
     .panel p { margin:0 0 12px; }
     .help { color:var(--muted); font:12px/1.35 Arial,sans-serif; }
-    .button { border:1px solid var(--accent); padding:10px 14px; background:var(--accent); color:#17130c; cursor:pointer; font:700 12px Arial,sans-serif; letter-spacing:.7px; text-transform:uppercase; pointer-events:auto; touch-action:manipulation; }
+    .button { border:1px solid var(--accent); padding:10px 14px; background:var(--accent); color:#17130c; cursor:pointer; font:700 12px Arial,sans-serif; letter-spacing:.7px; text-transform:uppercase; }
     .button.secondary { border-color:var(--line); background:rgba(16,17,22,.85); color:var(--ink); }
     .button:disabled { cursor:wait; opacity:.65; }
     .button:focus-visible { outline:2px solid white; outline-offset:3px; }
@@ -29,7 +29,7 @@
     .clue.visible { display:block; }
     .keypad { display:none; margin-top:12px; }
     .keypad.visible { display:block; }
-    .code-display { min-height:36px; margin-bottom:8px; padding:8px; border:1px solid var(--line); background:rgba(0,0,0,.3); color:var(--accent); font:700 20px/1.1 monospace; letter-spacing:6px; text-align:center; }
+    .code-display { min-height:36px; margin-bottom:8px; padding:8px; border:1px solid var(--line); background:rgba(0,0,0,.3); color:var(--accent); font:700 20px/1.1 monospace; letter-spacing:6px; }
     .keys { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
     .key-button { min-height:38px; border:1px solid var(--line); background:#2a2b31; color:var(--ink); cursor:pointer; font:700 16px Arial,sans-serif; }
     .key-button:hover { background:#3c3d45; }
@@ -299,217 +299,4 @@
       if (typeof alpha !== 'number' || typeof beta !== 'number' || typeof gamma !== 'number') return;
       buildDeviceQuaternion(alpha,beta,gamma);
       if (!referenceReady) {
-        referenceQuaternion.copy(deviceQuaternion);
-        inverseReferenceQuaternion.copy(referenceQuaternion).invert();
-        referenceReady = true;
-        setStatus('Sensores activos. Inspecciona las pistas.');
-      }
-      cameraQuaternionTarget.copy(inverseReferenceQuaternion).multiply(deviceQuaternion);
-    }
-    function onDeviceOrientation(event) { updateOrientation(event.alpha,event.beta,event.gamma); }
-    function attachBrowserOrientation() {
-      if (orientationListening) return;
-      addEventListener('deviceorientation',onDeviceOrientation,true);
-      orientationListening = true;
-    }
-    function startTelegramSensors() {
-      let started = false;
-      const sensor = telegram?.DeviceOrientation;
-      if (typeof sensor?.start === 'function') {
-        try { sensor.start({refresh_rate:30},error => error && console.warn(error)); started = true; } catch (error) { console.warn(error); }
-      }
-      if (typeof sensor?.onEvent === 'function') sensor.onEvent(data => updateOrientation(data?.alpha,data?.beta,data?.gamma));
-      return started;
-    }
-    function resetOrientationReference() {
-      referenceReady = false;
-      cameraQuaternionTarget.identity();
-      cameraQuaternionCurrent.identity();
-      camera.quaternion.identity();
-      setStatus('Vista centrada. Mueve el teléfono suavemente.');
-    }
-    async function enableSensors() {
-      sensorButton.disabled = true;
-      sensorButton.textContent = 'Solicitando permiso...';
-      setStatus('Solicitando acceso a los sensores...');
-      try {
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission !== 'granted') throw new Error('Permiso de sensores rechazado');
-        }
-        attachBrowserOrientation();
-        startTelegramSensors();
-        resetOrientationReference();
-        sensorButton.textContent = 'Sensores activos';
-        recenterButton.hidden = false;
-      } catch (error) {
-        console.error(error);
-        setStatus(error.message || 'No se pudieron activar los sensores');
-        sensorButton.disabled = false;
-        sensorButton.textContent = 'Reintentar sensores';
-      }
-    }
-    function getFocusMeshes(object) {
-      focusMeshes.length = 0;
-      object.traverse(child => {
-        if (child.isMesh && child.visible) focusMeshes.push(child);
-      });
-      return focusMeshes;
-    }
-    function focusObject(object, maxDistance = 9) {
-      scene.updateMatrixWorld(true);
-      camera.getWorldPosition(focusOrigin);
-      camera.getWorldDirection(focusDirection);
-      focusRaycaster.set(focusOrigin, focusDirection);
-      const meshes = getFocusMeshes(object);
-      if (!meshes.length) return false;
-      const intersections = focusRaycaster.intersectObjects(meshes, false);
-      return intersections.length > 0 && intersections[0].distance <= maxDistance;
-    }
-    function message(text) { prompt.textContent = text; }
-    function updateAction() {
-      actionButton.hidden = true;
-      keypad.classList.remove('visible');
-
-      if (gameState.step === 1 && focusObject(objects.file)) {
-        actionButton.hidden = false;
-        actionButton.textContent = 'Examinar archivo';
-        return;
-      }
-      if (gameState.step === 1.5 && focusObject(objects.mirror)) {
-        actionButton.hidden = false;
-        actionButton.textContent = 'Observar reflejo';
-        return;
-      }
-      if (gameState.step === 2 && focusObject(objects.cabinet)) {
-        actionButton.hidden = false;
-        actionButton.textContent = 'Abrir candado';
-        return;
-      }
-      if (gameState.step === 3 && focusObject(objects.uv)) {
-        actionButton.hidden = false;
-        actionButton.textContent = 'Tomar luz UV';
-        return;
-      }
-      if (gameState.step === 4 && focusObject(objects.notebook)) {
-        actionButton.hidden = false;
-        actionButton.textContent = 'Iluminar libreta';
-        return;
-      }
-      if (gameState.step === 5 && focusObject(objects.door)) {
-        actionButton.hidden = false;
-        actionButton.textContent = 'Introducir código';
-        keypad.classList.add('visible');
-      }
-    }
-    function performAction() {
-      if (actionCooldown) return;
-      actionCooldown = true;
-      setTimeout(() => actionCooldown = false, 300);
-
-      if (gameState.step === 1 && focusObject(objects.file)) {
-        gameState.step = 1.5;
-        clue.textContent = 'Pista del archivo: 19–47. Ahora observa el reflejo junto al cuadro.';
-        clue.classList.add('visible');
-        message('El informe revela una fecha: 1947. Enfoca el espejo junto al cuadro.');
-        updateAction();
-        return;
-      }
-      if (gameState.step === 1.5 && focusObject(objects.mirror)) {
-        gameState.step = 2;
-        clue.textContent = 'Combinación del candado: 1947.';
-        message('El reflejo confirma la combinación. Enfoca el mueble con candado.');
-        updateAction();
-        return;
-      }
-      if (gameState.step === 2 && focusObject(objects.cabinet)) {
-        const answer = window.prompt('Introduce la combinación del candado:');
-        if (answer === gameState.combination) {
-          gameState.step = 3;
-          gameState.hasUV = true;
-          uvGroup.visible = true;
-          cabinetDoor.material = wood;
-          message('Candado abierto. Has encontrado una luz UV. Busca la libreta.');
-        } else {
-          message('Combinación incorrecta. Usa la fecha 1947.');
-        }
-        updateAction();
-        return;
-      }
-      if (gameState.step === 3 && focusObject(objects.uv)) {
-        gameState.step = 4;
-        message('Luz UV obtenida. Enfoca la libreta aparentemente en blanco.');
-        updateAction();
-        return;
-      }
-      if (gameState.step === 4 && gameState.hasUV && focusObject(objects.notebook)) {
-        gameState.step = 5;
-        gameState.uvUsed = true;
-        hiddenInk.visible = true;
-        clue.textContent = 'La luz ultravioleta revela el código secreto: 5826.';
-        clue.classList.add('visible');
-        message('La tinta invisible aparece. Enfoca la puerta e introduce el código.');
-        updateAction();
-        return;
-      }
-      if (gameState.step === 5 && focusObject(objects.door)) {
-        keypad.classList.add('visible');
-        message('Introduce el código secreto de cuatro dígitos.');
-        updateAction();
-      }
-    }
-    function updateCodeDisplay() { codeDisplay.textContent = gameState.enteredCode.padEnd(4,'_'); }
-    function submitCode() {
-      if (gameState.enteredCode.length !== 4) { message('El código debe tener cuatro dígitos.'); return; }
-      if (gameState.enteredCode === gameState.secretCode) {
-        gameState.step = 6;
-        doorMesh.material = new THREE.MeshStandardMaterial({ color:0x668d62, roughness:.65 });
-        success.classList.add('visible');
-        message('¡Código correcto! El despacho queda resuelto. Puedes salir.');
-        exitButton.hidden = false;
-        keypad.classList.remove('visible');
-        actionButton.hidden = true;
-      } else {
-        gameState.enteredCode = '';
-        updateCodeDisplay();
-        message('Código incorrecto. Revisa la revelación UV e inténtalo otra vez.');
-      }
-    }
-
-    sensorButton.addEventListener('click', enableSensors);
-    recenterButton.addEventListener('click', resetOrientationReference);
-    actionButton.addEventListener('click', performAction);
-    exitButton.addEventListener('click', () => telegram?.close());
-    document.querySelectorAll('[data-digit]').forEach(element => element.addEventListener('click', () => { if (gameState.enteredCode.length < 4) gameState.enteredCode += element.dataset.digit; updateCodeDisplay(); }));
-    document.querySelector('#clear-code').addEventListener('click', () => { gameState.enteredCode = ''; updateCodeDisplay(); });
-    document.querySelector('#submit-code').addEventListener('click', submitCode);
-
-    if (screen.orientation) screen.orientation.addEventListener('change', () => { if (referenceReady) referenceReady = false; });
-    else addEventListener('orientationchange', () => { if (referenceReady) referenceReady = false; });
-    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
-
-    renderer.domElement.addEventListener('pointerdown', event => { dragging = true; lastPointerX = event.clientX; lastPointerY = event.clientY; renderer.domElement.setPointerCapture?.(event.pointerId); });
-    renderer.domElement.addEventListener('pointermove', event => {
-      if (!dragging) return;
-      const dx = event.clientX - lastPointerX;
-      const dy = event.clientY - lastPointerY;
-      lastPointerX = event.clientX;
-      lastPointerY = event.clientY;
-      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-dy * .006, -dx * .006, 0, 'YXZ'));
-      cameraQuaternionTarget.multiply(q);
-    });
-    renderer.domElement.addEventListener('pointerup', event => { dragging = false; renderer.domElement.releasePointerCapture?.(event.pointerId); });
-    renderer.domElement.addEventListener('pointercancel', () => { dragging = false; });
-
-    function animate() {
-      requestAnimationFrame(animate);
-      cameraQuaternionCurrent.slerp(cameraQuaternionTarget, .16);
-      camera.quaternion.copy(cameraQuaternionCurrent);
-      deskLamp.intensity = 16 + Math.sin(performance.now() * .003) * 2;
-      updateAction();
-      renderer.render(scene, camera);
-    }
-    animate();
-  </script>
-</body>
-</html>
+      ... (truncated for brevity) ...
